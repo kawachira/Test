@@ -70,7 +70,7 @@ def get_pe_interpretation(pe):
     if pe < 30: return "🟡 ราคาเหมาะสม"
     return "🟠 หุ้นแพง (Growth)"
 
-# --- 5. Get Data (Updated Cache Logic) ---
+# --- 5. Get Data ---
 @st.cache_data(ttl=10, show_spinner=False)
 def get_data(symbol, interval):
     try:
@@ -78,7 +78,6 @@ def get_data(symbol, interval):
         period_val = "730d" if interval == "1h" else "10y"
         df = ticker.history(period=period_val, interval=interval)
         
-        # --- NEW: ดึงข้อมูล Market Cap และ Volume Avg เพื่อความแม่นยำ ---
         stock_info = {
             'longName': ticker.info.get('longName', symbol),
             'trailingPE': ticker.info.get('trailingPE', 'N/A'),
@@ -102,8 +101,7 @@ def get_data(symbol, interval):
     except:
         return None, None
 
-# --- 6. AI Logic (UPDATED: เพิ่มตัวแปรใหม่เข้าไปคำนวณ) ---
-# เพิ่ม arguments: macd_val, macd_signal, adx_val, bb_upper, bb_lower
+# --- 6. AI Logic (Enhanced Version) ---
 def analyze_market_structure(price, ema20, ema50, ema200, rsi, macd_val, macd_signal, adx_val, bb_upper, bb_lower):
     report = {
         "technical": {},
@@ -124,11 +122,9 @@ def analyze_market_structure(price, ema20, ema50, ema200, rsi, macd_val, macd_si
     # --- เช็ค Momentum ด้วย MACD ---
     macd_status = "Bullish" if macd_val > macd_signal else "Bearish"
 
-    # --- Scenario 1: ขาขึ้นแข็งแกร่ง (Super Strong Uptrend) ---
+    # --- Scenario 1: ขาขึ้นแข็งแกร่ง ---
     if price > ema200 and price > ema50 and price > ema20:
         report["status_color"] = "green"
-        
-        # เพิ่มการเช็ค MACD และ ADX เพื่อความแม่นยำ
         if adx_val > 25 and macd_status == "Bullish":
              report["banner_title"] = "🚀 Super Bullish: ขาขึ้นสมบูรณ์แบบ"
         else:
@@ -139,7 +135,6 @@ def analyze_market_structure(price, ema20, ema50, ema200, rsi, macd_val, macd_si
             "status": f"MACD ตัดขึ้น ({macd_status}) สนับสนุนทิศทางขาขึ้น"
         }
         
-        # เช็ค Bollinger Band: ถ้าราคาทะลุกรอบบน ระวังการย่อตัว
         if price > bb_upper:
             report["context"] = "⚠️ ราคาทะลุกรอบ Bollinger Band บน (Overextended) ระวังแรงขายทำกำไรระยะสั้น อย่าเพิ่งไล่ราคาตอนนี้"
             action_1 = "แบ่งขายทำกำไรบางส่วน (Trim Profit) แล้วรอรับกลับเมื่อย่อ"
@@ -150,30 +145,25 @@ def analyze_market_structure(price, ema20, ema50, ema200, rsi, macd_val, macd_si
         action_2 = f"จุดรับที่ดีคือ EMA 20 ({ema20:.2f}) หรือเส้นกลาง Bollinger"
         report["action"] = {"strategy": "**กลยุทธ์: Follow Trend (เกาะเทรนด์)**", "steps": [action_1, action_2]}
 
-    # --- Scenario 2: ขาขึ้นพักตัว (Correction) ---
+    # --- Scenario 2: ขาขึ้นพักตัว ---
     elif price > ema200 and price < ema20:
         report["status_color"] = "orange"
         report["banner_title"] = "Correction: พักตัวในขาขึ้น"
-
-        # ใช้ MACD ช่วยดูว่าพักตัวจบหรือยัง
         reversal_sign = "เริ่มมีสัญญาณกลับตัว" if macd_val > macd_signal else "แรงขายยังกดดันอยู่"
 
         report["technical"] = {
             "structure": "หลุด EMA 20 ลงมาพักตัว แต่ยังอยู่เหนือ EMA 200 (ระยะยาวยังขึ้น)",
             "status": f"ADX = {adx_val:.2f} ({trend_strength}) | MACD: {reversal_sign}"
         }
-        
         report["context"] = "เป็นจังหวะย่อตัวเพื่อสร้างฐานใหม่ (Healthy Correction) ตราบใดที่ไม่หลุด EMA 200 โครงสร้างยังไม่เสีย"
-        
         action_1 = f"รอสัญญาณกลับตัว (Reversal Candle) แถว EMA 50 ({ema50:.2f}) หรือ EMA 200"
         action_2 = "ถ้า MACD ตัดขึ้น (Cross up) อีกครั้ง คือสัญญาณเข้าซื้อรอบใหม่ (Re-entry)"
-
         report["action"] = {"strategy": "**กลยุทธ์: Buy on Dip (รอย่อซื้อ)**", "steps": [action_1, action_2]}
 
-    # --- Scenario 3: ขาลง (Downtrend) ---
+    # --- Scenario 3: ขาลง ---
     elif price < ema200 and price < ema50:
         if price < ema20:
-            if rsi < 25 or price < bb_lower: # เพิ่มเงื่อนไขหลุดกรอบล่าง BB
+            if rsi < 25 or price < bb_lower:
                 report["status_color"] = "orange"
                 report["banner_title"] = "Oversold Bounce: ลุ้นเด้งสั้น (Oversold)"
                 report["technical"] = {
@@ -194,7 +184,6 @@ def analyze_market_structure(price, ema20, ema50, ema200, rsi, macd_val, macd_si
                 action_1 = "ห้ามรับมีด (Don't Buy) จนกว่าราคาจะยืนเหนือ EMA 20 ได้"
                 action_2 = "ใครติดดอย หาจังหวะเด้งเพื่อลดพอร์ต (Cut Loss / Reduce Position)"
         else:
-             # เด้งในขาลง
             report["status_color"] = "orange"
             report["banner_title"] = "Rebound: เด้งเพื่อลงต่อ?"
             report["technical"] = {
@@ -207,10 +196,9 @@ def analyze_market_structure(price, ema20, ema50, ema200, rsi, macd_val, macd_si
         
         report["action"] = {"strategy": "**กลยุทธ์: Defensive / Short Sell**", "steps": [action_1, action_2]}
 
-    # --- Scenario 4: ไซด์เวย์ (Sideway) ---
+    # --- Scenario 4: ไซด์เวย์ ---
     else:
         report["status_color"] = "yellow"
-        # ใช้ Bollinger Band Width ช่วยดูการบีบตัว (Squeeze)
         bb_width = (bb_upper - bb_lower) / price
         sqz_text = "ระเบิดเลือกทางเร็วๆนี้" if bb_width < 0.10 else "แกว่งตัวในกรอบกว้าง"
 
@@ -227,7 +215,7 @@ def analyze_market_structure(price, ema20, ema50, ema200, rsi, macd_val, macd_si
 
     return report
 
-# --- 7. Display (ใส่ระบบ Loop Real-time) ---
+# --- 7. Display (Main Loop - FIX APPLIED HERE) ---
 if submit_btn:
     st.divider()
     result_placeholder = st.empty()
@@ -238,51 +226,77 @@ if submit_btn:
                 df, info = get_data(symbol_input, tf_code)
 
             if df is not None and not df.empty and len(df) > 200:
-                # --- CALCULATION ZONE (เพิ่มตรงนี้) ---
-                # 1. EMAs & RSI (เดิม)
+                # --- CALCULATION ZONE ---
+                
+                # 1. EMAs & RSI
                 df['EMA20'] = ta.ema(df['Close'], length=20)
                 df['EMA50'] = ta.ema(df['Close'], length=50)
                 df['EMA200'] = ta.ema(df['Close'], length=200)
                 df['RSI'] = ta.rsi(df['Close'], length=14)
                 
-                # 2. MACD (ใหม่) - บอกโมเมนตัม
+                # 2. MACD
                 macd = ta.macd(df['Close'])
-                df = pd.concat([df, macd], axis=1) # รวมเข้า DF
-                # macd columns: MACD_12_26_9, MACDh_12_26_9 (hist), MACDs_12_26_9 (signal)
+                df = pd.concat([df, macd], axis=1)
                 
-                # 3. Bollinger Bands (ใหม่) - บอก Volatility
+                # 3. Bollinger Bands (*** FIX: แก้ไขตรงนี้เพื่อกัน Error ***)
+                # คำนวณแล้วเก็บใส่ตัวแปร bbands ก่อน เพื่อดึงชื่อคอลัมน์ที่ถูกต้อง
                 bbands = ta.bbands(df['Close'], length=20, std=2)
-                df = pd.concat([df, bbands], axis=1)
-                # bb columns: BBL_20_2.0, BBM_20_2.0, BBU_20_2.0
                 
-                # 4. ADX (ใหม่) - บอก Trend Strength
+                # อ่านชื่อคอลัมน์จากผลลัพธ์จริงๆ (ไม่ต้องเดาชื่อ .0)
+                # ปกติ pandas_ta เรียง: Lower(0), Mid(1), Upper(2), Bandwidth(3), Percent(4)
+                if bbands is not None and len(bbands.columns) >= 3:
+                    bbl_col_name = bbands.columns[0]  # ชื่อคอลัมน์ Lower Band
+                    bbu_col_name = bbands.columns[2]  # ชื่อคอลัมน์ Upper Band
+                    df = pd.concat([df, bbands], axis=1)
+                else:
+                    # กันเหนียวเผื่อคำนวณไม่ได้
+                    bbl_col_name = None
+                    bbu_col_name = None
+
+                # 4. ADX
                 adx = ta.adx(df['High'], df['Low'], df['Close'], length=14)
                 df = pd.concat([df, adx], axis=1)
-                # adx column: ADX_14
 
                 # --- Extract Last Values ---
                 last = df.iloc[-1]
                 price = info['regularMarketPrice'] if info['regularMarketPrice'] else last['Close']
                 
-                # ดึงค่าตัวแปรเดิม
+                # ค่าเดิม
                 rsi = last['RSI']
                 ema20=last['EMA20']; ema50=last['EMA50']; ema200=last['EMA200']
                 
-                # ดึงค่าตัวแปรใหม่ (ใช้ชื่อ Column ตาม pandas_ta default)
-                macd_val = last['MACD_12_26_9']
-                macd_signal = last['MACDs_12_26_9']
-                adx_val = last['ADX_14']
-                bb_upper = last['BBU_20_2.0']
-                bb_lower = last['BBL_20_2.0']
+                # ค่าใหม่ (MACD)
+                # ใช้ iloc เพื่อความปลอดภัย หรือใช้ชื่อ default ของ pandas_ta
+                # Default names: MACD_12_26_9, MACDh_12_26_9, MACDs_12_26_9
+                try:
+                    macd_val = last['MACD_12_26_9']
+                    macd_signal = last['MACDs_12_26_9']
+                except KeyError:
+                    # Fallback ถ้าชื่อไม่ตรง (โอกาสน้อยมาก)
+                    macd_val = 0; macd_signal = 0
+
+                try:
+                    adx_val = last['ADX_14']
+                except KeyError:
+                    adx_val = 0
+
+                # ค่าใหม่ (Bollinger - ใช้ชื่อที่ดึงมาตะกี้)
+                if bbu_col_name and bbl_col_name:
+                    bb_upper = last[bbu_col_name]
+                    bb_lower = last[bbl_col_name]
+                else:
+                    bb_upper = price * 1.05
+                    bb_lower = price * 0.95
                 
-                # ส่งเข้า AI Logic ใหม่
+                # ส่งเข้า AI Logic
                 ai_report = analyze_market_structure(price, ema20, ema50, ema200, rsi, macd_val, macd_signal, adx_val, bb_upper, bb_lower)
 
-                # --- DISPLAY UI ---
+                # --- DISPLAY UI (คงเดิม) ---
+                
                 # Header
                 st.markdown(f"<h2 style='text-align: center; margin-top: -15px; margin-bottom: 25px;'>🏢 {info['longName']} ({symbol_input})</h2>", unsafe_allow_html=True)
                 
-                # Price Section (คงเดิม)
+                # Price Section
                 c1, c2 = st.columns(2)
                 with c1:
                     reg_price = info.get('regularMarketPrice')
@@ -308,7 +322,6 @@ if submit_btn:
                     </div>
                     """, unsafe_allow_html=True)
 
-                    # Pre/Post Logic (คงเดิม)
                     pre_p = info.get('preMarketPrice'); pre_c = info.get('preMarketChange'); 
                     post_p = info.get('postMarketPrice'); post_c = info.get('postMarketChange');
                     extra_html = ""
@@ -329,7 +342,7 @@ if submit_btn:
                 elif st_color == "red": c2.error(f"📉 {main_status}\n\n**{tf_label}**")
                 else: c2.warning(f"⚖️ {main_status}\n\n**{tf_label}**")
 
-                # Metrics Row 1 (Basic)
+                # Metrics Row 1
                 c3, c4, c5 = st.columns(3)
                 with c3:
                     st.metric("📊 P/E Ratio", f"{info['trailingPE']:.2f}" if isinstance(info['trailingPE'], (int,float)) else "N/A")
@@ -338,7 +351,6 @@ if submit_btn:
                     rsi_lbl = "Overbought" if rsi>=70 else ("Oversold" if rsi<=30 else "Neutral")
                     st.metric("⚡ RSI (14)", f"{rsi:.2f}", rsi_lbl, delta_color="inverse" if rsi>70 else "normal")
                 with c5:
-                    # NEW METRIC: ADX
                     adx_lbl = "Strong Trend" if adx_val > 25 else "Weak/Sideway"
                     st.metric("💪 ADX Strength", f"{adx_val:.2f}", adx_lbl)
 
@@ -348,7 +360,6 @@ if submit_btn:
                 c_ema, c_ai = st.columns([1.5, 2])
                 with c_ema:
                     st.subheader("📉 Technical Indicators")
-                    # Update ให้แสดงค่าใหม่ด้วย
                     st.markdown(f"""
                     <div style='background-color: var(--secondary-background-color); padding: 15px; border-radius: 10px; font-size: 0.95rem;'>
                         <div style='display:flex; justify-content:space-between; margin-bottom:5px; border-bottom:1px solid #ddd;'><b>Indicator</b> <b>Value</b></div>
@@ -364,7 +375,7 @@ if submit_btn:
                     
                     st.subheader("🚧 Key Levels (S/R)")
                     supports, resistances = [] , []
-                    # Logic แนวรับแนวต้านเดิม เพิ่มเติมคือใช้ BB มาช่วย
+                    
                     if price > ema200: supports.extend([(ema20, "EMA 20"), (bb_lower, "BB Lower")])
                     else: resistances.extend([(ema200, "EMA 200"), (bb_upper, "BB Upper")])
                     
