@@ -355,7 +355,7 @@ if submit_btn:
                         arrow = "▲" if change >= 0 else "▼"
                         return f'<span style="background:{bg}; color:{color}; padding: 4px 10px; border-radius: 12px; font-size: 16px; font-weight: 600; margin-left: 8px;">{arrow} {change:+.2f} ({percent:.2f}%)</span>'
 
-                    # 1. สร้าง HTML ส่วน OHLC (1. ✅ UPDATE: ปรับขนาด font เป็น 14px เพื่อให้ไม่ใหญ่เกินไป)
+                    # 1. สร้าง HTML ส่วน OHLC (1. ✅ UPDATE: ปรับขนาดเป็น 13px, margin ชิดขึ้น, nowrap เพื่อให้อยู่บรรทัดเดียว)
                     ohlc_html = ""
                     m_state = info.get('marketState', '').upper()
                     if m_state != "REGULAR": 
@@ -369,14 +369,12 @@ if submit_btn:
                             day_chg = info.get('regularMarketChange', 0)
                             val_color = "#16a34a" if day_chg >= 0 else "#dc2626"
                             
-                            # Label (O,H,L,C): ไม่ใส่สี (inherit ตาม Theme)
-                            # Value (ตัวเลข): ใส่สีตาม val_color
                             ohlc_html = f"""
-                            <div style="font-size: 14px; font-weight: 600; margin-bottom: 8px; font-family: 'Source Sans Pro', sans-serif;">
-                                <span style="margin-right: 10px; opacity: 0.8;">O</span> <span style="color: {val_color}; margin-right: 15px;">{d_open:.2f}</span>
-                                <span style="margin-right: 10px; opacity: 0.8;">H</span> <span style="color: {val_color}; margin-right: 15px;">{d_high:.2f}</span>
-                                <span style="margin-right: 10px; opacity: 0.8;">L</span> <span style="color: {val_color}; margin-right: 15px;">{d_low:.2f}</span>
-                                <span style="margin-right: 10px; opacity: 0.8;">C</span> <span style="color: {val_color};">{d_close:.2f}</span>
+                            <div style="font-size: 13px; font-weight: 600; margin-bottom: 5px; font-family: 'Source Sans Pro', sans-serif; white-space: nowrap; overflow-x: auto;">
+                                <span style="margin-right: 5px; opacity: 0.7;">O</span><span style="color: {val_color}; margin-right: 12px;">{d_open:.2f}</span>
+                                <span style="margin-right: 5px; opacity: 0.7;">H</span><span style="color: {val_color}; margin-right: 12px;">{d_high:.2f}</span>
+                                <span style="margin-right: 5px; opacity: 0.7;">L</span><span style="color: {val_color}; margin-right: 12px;">{d_low:.2f}</span>
+                                <span style="margin-right: 5px; opacity: 0.7;">C</span><span style="color: {val_color};">{d_close:.2f}</span>
                             </div>
                             """
 
