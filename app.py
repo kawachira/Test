@@ -8,11 +8,18 @@ import time
 # --- 1. ตั้งค่าหน้าเว็บ ---
 st.set_page_config(page_title="AI Stock Master", page_icon="💎", layout="wide")
 
-# --- 2. CSS ปรับแต่ง (คงเดิมตามที่สั่ง) ---
+# --- 2. CSS ปรับแต่ง (UPDATE: เพิ่มการล๊อคสกรอลบาร์ เเละขยับ Layout) ---
 st.markdown("""
     <style>
+    /* --- UPDATE: ล๊อคการเลื่อนหน้าจอในตอนเริ่มต้น --- */
+    body {
+        overflow: hidden;
+    }
+
     /* เพิ่ม padding ด้านล่าง เพื่อไม่ให้ปุ่ม Manage app บังเนื้อหา */
-    .block-container { padding-top: 1rem !important; padding-bottom: 5rem !important; }
+    /* --- UPDATE: ลด padding ด้านบนลงอีกนิด เพื่อขยับช่องค้นหาขึ้น --- */
+    .block-container { padding-top: 0.5rem !important; padding-bottom: 5rem !important; }
+
     /* ลด margin ด้านล่างของหัวข้อ เพื่อขยับช่องค้นหาขึ้น */
     h1 { text-align: center; font-size: 2.8rem !important; margin-bottom: 5px; }
     div[data-testid="stForm"] {
@@ -62,7 +69,7 @@ def custom_metric_html(label, value, delta_text, color_status, icon_svg):
     elif color_status == "red": color_code = "#dc2626"   # แดง
     else: color_code = "#6b7280"                         # เทา (Neutral)
     
-    # สร้าง HTML สำหรับแสดงผล
+    # สร้าง HTML สำหรับแสดงผล (จัด alignment ให้พอดี)
     html = f"""
     <div style="font-family: 'Source Sans Pro', sans-serif; margin-bottom: 10px;">
         <div style="font-size: 14px; color: rgba(49, 51, 63, 0.6); margin-bottom: 4px;">{label}</div>
@@ -246,6 +253,16 @@ def analyze_market_structure(price, ema20, ema50, ema200, rsi, macd_val, macd_si
 # --- 7. Display ---
 if submit_btn:
     st.divider()
+    
+    # --- UPDATE: ปลดล๊อคการเลื่อนหน้าจอ เมื่อกดปุ่ม ---
+    st.markdown("""
+        <style>
+        body {
+            overflow: auto !important;
+        }
+        </style>
+        """, unsafe_allow_html=True)
+
     result_placeholder = st.empty()
     
     while True:
@@ -333,15 +350,18 @@ if submit_btn:
                     st.metric("📊 P/E Ratio", f"{info['trailingPE']:.2f}" if isinstance(info['trailingPE'], (int,float)) else "N/A")
                     st.caption(get_pe_interpretation(info['trailingPE']))
                 
-                # --- นิยามไอคอน SVG (คงเดิม) ---
+                # --- UPDATE: นิยามไอคอน SVG แบบคลาสสิก (ลูกศรทึบ) ตามที่ขอ ---
+                # ลูกศรชี้ขึ้น (เขียว) - แบบทึบ
                 icon_up_svg = """<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="#16a34a"><path d="M12 4l-8 8h16z"/></svg>"""
+                # ลูกศรชี้ลง (แดง) - แบบทึบ
                 icon_down_svg = """<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="#dc2626"><path d="M12 20l8-8H4z"/></svg>"""
+                # วงกลม (เทา)
                 icon_flat_svg = """<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="#6b7280"><circle cx="12" cy="12" r="10"/></svg>"""
                 
-                # --- แก้ไข: ไอคอน Weak/Sideway เป็นลูกศรสวนทาง (Double Arrow) แบบทึบ ---
+                # --- UPDATE: ลูกศรคลื่น (เทา) - ใช้แบบทึบสองหัวตามที่ขอใหม่ ---
                 icon_wave_svg = """<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="#6b7280"><path d="M16,17.01V10h-2v7.01h-3L15,21l4-3.99H16z M9,3L5,6.99h3V14h2V6.99h3L9,3z"/></svg>"""
 
-                # Custom RSI Metric (ใช้ SVG - คงเดิม)
+                # Custom RSI Metric (ใช้ SVG)
                 with c4:
                     rsi_short_lbl = get_rsi_short_label(rsi)
                     if rsi >= 70: 
@@ -358,7 +378,7 @@ if submit_btn:
                     st.markdown(custom_metric_html("⚡ RSI (14)", f"{rsi:.2f}", rsi_short_lbl, c_stat, icon_final), unsafe_allow_html=True)
                     st.caption(get_rsi_interpretation(rsi))
 
-                # Custom ADX Metric (ใช้ SVG - คงเดิม)
+                # Custom ADX Metric (ใช้ SVG คลื่นหรือลูกศรทึบ)
                 with c5:
                     if adx_val > 25:
                         c_stat = "green"; icon_final = icon_up_svg
