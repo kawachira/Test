@@ -22,13 +22,11 @@ st.markdown("""
     div[data-testid="stFormSubmitButton"] button {
         width: 100%; border-radius: 12px; font-size: 1.2rem; font-weight: bold; padding: 15px 0;
     }
-    div[data-testid="metric-container"] label { font-size: 1.1rem; }
-    div[data-testid="metric-container"] div[data-testid="stMetricValue"] { font-size: 1.8rem; }
     </style>
     """, unsafe_allow_html=True)
 
 # --- 3. ส่วนหัวข้อ ---
-st.markdown("<h1>💎 Ai<br><span style='font-size: 1.5rem; opacity: 0.7;'>ระบบวิเคราะห์หุ้นอัจฉริยะ (Final Master)</span></h1>", unsafe_allow_html=True)
+st.markdown("<h1>💎 Ai<br><span style='font-size: 1.5rem; opacity: 0.7;'>ระบบวิเคราะห์หุ้นอัจฉริยะ (Custom Icons)</span></h1>", unsafe_allow_html=True)
 st.write("")
 
 # --- Form ค้นหา ---
@@ -53,6 +51,25 @@ with col_form:
 def arrow_html(change):
     if change is None: return ""
     return "<span style='color:#16a34a;font-weight:600'>▲</span>" if change > 0 else "<span style='color:#dc2626;font-weight:600'>▼</span>"
+
+# --- NEW FUNCTION: สร้าง Metric แบบกำหนดไอคอนเองได้ ---
+def custom_metric_html(label, value, delta_text, color_status, icon_char):
+    # กำหนดสี
+    if color_status == "green": color_code = "#16a34a" # เขียว
+    elif color_status == "red": color_code = "#dc2626"   # แดง
+    else: color_code = "#6b7280"                         # เทา (Neutral)
+    
+    html = f"""
+    <div style="font-family: 'Source Sans Pro', sans-serif; margin-bottom: 10px;">
+        <div style="font-size: 14px; color: rgba(49, 51, 63, 0.6); margin-bottom: 4px;">{label}</div>
+        <div style="font-size: 32px; font-weight: 600; color: rgb(49, 51, 63); line-height: 1.2;">{value}</div>
+        <div style="display: flex; align-items: center; gap: 5px; font-size: 16px; font-weight: 500; color: {color_code};">
+            <span style="font-size: 18px;">{icon_char}</span>
+            <span>{delta_text}</span>
+        </div>
+    </div>
+    """
+    return html
 
 def get_rsi_interpretation(rsi):
     if rsi >= 80: return "🔴 **Extreme Overbought (80+):** แรงซื้อบ้าคลั่ง ระวังการเทขายรุนแรง"
@@ -147,8 +164,7 @@ def get_data(symbol, interval):
 # --- 6. AI Logic ---
 def analyze_market_structure(price, ema20, ema50, ema200, rsi, macd_val, macd_signal, adx_val, bb_upper, bb_lower):
     report = { "technical": {}, "context": "", "action": {}, "status_color": "", "banner_title": "" }
-    def pick_one(sentences): return random.choice(sentences)
-
+    
     trend_strength = ""
     if adx_val > 50: trend_strength = "Trend แข็งแกร่งมาก (Super Strong)"
     elif adx_val > 25: trend_strength = "มี Trend ชัดเจน (Strong)"
@@ -302,23 +318,39 @@ if submit_btn:
                 elif st_color == "red": c2.error(f"📉 {main_status}\n\n**{tf_label}**")
                 else: c2.warning(f"⚖️ {main_status}\n\n**{tf_label}**")
 
+                # --- Metrics Section (Modified for Custom Arrows) ---
                 c3, c4, c5 = st.columns(3)
                 with c3:
                     st.metric("📊 P/E Ratio", f"{info['trailingPE']:.2f}" if isinstance(info['trailingPE'], (int,float)) else "N/A")
                     st.caption(get_pe_interpretation(info['trailingPE']))
+                
+                # Custom RSI Metric
                 with c4:
                     rsi_short_lbl = get_rsi_short_label(rsi)
-                    if rsi >= 70: r_color = "inverse"
-                    elif rsi >= 55: r_color = "normal"
-                    elif rsi >= 45: r_color = "off"
-                    elif rsi >= 30: r_color = "inverse"
-                    else: r_color = "normal"
-                    st.metric("⚡ RSI (14)", f"{rsi:.2f}", rsi_short_lbl, delta_color=r_color)
+                    # กำหนดสีและไอคอน
+                    if rsi >= 70: 
+                        c_stat = "red"; icon = "▲" # Overbought (สูง)
+                    elif rsi >= 55: 
+                        c_stat = "green"; icon = "▲" # Bullish
+                    elif rsi >= 45: 
+                        c_stat = "gray"; icon = "●" # Neutral
+                    elif rsi >= 30: 
+                        c_stat = "red"; icon = "▼" # Bearish (ลง) -> แก้ตรงนี้!
+                    else: 
+                        c_stat = "green"; icon = "▼" # Oversold (ถูกมาก)
+                    
+                    st.markdown(custom_metric_html("⚡ RSI (14)", f"{rsi:.2f}", rsi_short_lbl, c_stat, icon), unsafe_allow_html=True)
                     st.caption(get_rsi_interpretation(rsi))
+
+                # Custom ADX Metric
                 with c5:
                     adx_lbl = "Strong Trend" if adx_val > 25 else "Weak/Sideway"
-                    a_color = "normal" if adx_val > 25 else "off"
-                    st.metric("💪 ADX Strength", f"{adx_val:.2f}", adx_lbl, delta_color=a_color)
+                    if adx_val > 25:
+                        c_stat = "green"; icon = "▲"
+                    else:
+                        c_stat = "gray"; icon = "↭" # ใช้ไอคอนลูกศรคลื่นตามที่ขอ (Left Right Wave Arrow)
+                        
+                    st.markdown(custom_metric_html("💪 ADX Strength", f"{adx_val:.2f}", adx_lbl, c_stat, icon), unsafe_allow_html=True)
                     st.caption(get_adx_interpretation(adx_val))
 
                 st.write("") 
@@ -339,7 +371,6 @@ if submit_btn:
                     </div>
                     """, unsafe_allow_html=True)
                     
-                    # --- SMART FILTER KEY LEVELS ---
                     st.subheader("🚧 Key Levels (Smart Filter)")
                     
                     potential_levels = [
@@ -358,7 +389,6 @@ if submit_btn:
                     raw_supports.sort(key=lambda x: x[0], reverse=True)
                     raw_resistances.sort(key=lambda x: x[0])
 
-                    # Logic: เว้นระยะห่าง 1.5% (Threshold)
                     def filter_levels(levels, threshold_pct=0.015):
                         selected = []
                         for val, label in levels:
