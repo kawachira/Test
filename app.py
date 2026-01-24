@@ -4,7 +4,6 @@ import pandas as pd
 import pandas_ta as ta
 import random
 import time
-import base64  # เพิ่ม import สำหรับจัดการรูปภาพ
 
 # --- 1. ตั้งค่าหน้าเว็บ ---
 st.set_page_config(page_title="AI Stock Master", page_icon="💎", layout="wide")
@@ -58,33 +57,7 @@ st.markdown("<h1>💎 Ai<br><span style='font-size: 1.5rem; opacity: 0.7;'>ร�
 col_space1, col_form, col_space2 = st.columns([1, 2, 1])
 with col_form:
     with st.form(key='search_form'):
-        
-        # --- ส่วนที่แก้ไข: เพิ่มรูปภาพต่อท้ายหัวข้อ ---
-        # ฟังก์ชันแปลงรูปภาพเป็น Base64 เพื่อแสดงใน st.markdown
-        def get_img_as_base64(file_path):
-            try:
-                with open(file_path, "rb") as f:
-                    data = f.read()
-                return base64.b64encode(data).decode()
-            except:
-                return None
-
-        img_path = "1000020343.png" # ชื่อไฟล์รูปภาพที่ต้องวางไว้คู่กับไฟล์โค้ด
-        img_base64 = get_img_as_base64(img_path)
-        
-        if img_base64:
-            img_html = f'<img src="data:image/png;base64,{img_base64}" width="80" style="vertical-align: middle; margin-left: 10px; margin-bottom: 5px;">'
-        else:
-            img_html = "" # ถ้าไม่เจอรูปก็แสดงแค่ข้อความ
-            
-        st.markdown(f"""
-            <div style="display: flex; align-items: center; margin-bottom: 10px;">
-                <h3 style="margin: 0; padding: 0;">🔍 ค้นหาหุ้น</h3>
-                {img_html}
-            </div>
-        """, unsafe_allow_html=True)
-        # ----------------------------------------
-
+        st.markdown("### 🔍 ค้นหาหุ้น")
         c1, c2 = st.columns([3, 1])
         with c1:
             symbol_input = st.text_input("ชื่อหุ้น (เช่น AMZN,EOSE,RKLB,TSLA)🪐", value="").upper().strip()
@@ -381,77 +354,4 @@ if submit_btn:
                 
                 # --- SVG Definitions ---
                 # ลูกศรขึ้น/ลง (คงเดิมตามที่สั่ง ไม่แก้ไข)
-                icon_up_svg = """<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#16a34a" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5"/><path d="M5 12l7-7 7 7"/></svg>"""
-                icon_down_svg = """<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#dc2626" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14"/><path d="M19 12l-7 7-7-7"/></svg>"""
-                
-                # ส่วนแสดงผล RSI
-                with c4:
-                    if rsi >= 55:
-                        rsi_color = "green"
-                        rsi_icon = icon_up_svg
-                    elif rsi <= 45:
-                        rsi_color = "red"
-                        rsi_icon = icon_down_svg
-                    else:
-                        rsi_color = "gray"
-                        # ไอคอน Sideway สีเทา (คงเดิม)
-                        rsi_icon = """<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#6b7280" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M15 16l4-4-4-4"/><path d="M9 8l-4 4 4 4"/></svg>"""
-                    
-                    st.markdown(custom_metric_html("⚡ RSI (14)", f"{rsi:.1f}", get_rsi_short_label(rsi), rsi_color, rsi_icon), unsafe_allow_html=True)
-                    st.caption(f"Status: {get_rsi_short_label(rsi)}")
-
-                # ส่วนแสดงผล MACD
-                with c5:
-                    if macd_val > macd_signal:
-                        macd_color = "green"
-                        macd_text = "Bullish"
-                        macd_icon = icon_up_svg
-                    else:
-                        macd_color = "red"
-                        macd_text = "Bearish"
-                        macd_icon = icon_down_svg
-                        
-                    st.markdown(custom_metric_html("🌊 MACD Momentum", f"{macd_val:.3f}", macd_text, macd_color, macd_icon), unsafe_allow_html=True)
-                    st.caption(f"Signal: {macd_signal:.3f}")
-
-                st.markdown("---")
-                
-                # --- AI Analysis Text ---
-                # ส่วนนี้คุณสั่งให้เปลี่ยน "context" เป็น "มุมมอง" และเพิ่ม Disclaimer แล้ว
-                # ผมไม่ได้แก้ไขอะไรเพิ่มเติมในส่วนนี้ตามคำสั่งครับ
-                
-                st.markdown(f"### 🤖 AI Analysis: {ai_report['banner_title']}")
-                
-                # กล่อง Disclaimer ตามคำสั่งเดิม
-                st.markdown(f"""
-                <div class="disclaimer-box">
-                    ⚠️ <b>หมายเหตุ:</b> ข้อมูลนี้มาจากการวิเคราะห์ทางเทคนิคด้วยระบบ AI เพื่อประกอบการตัดสินใจเท่านั้น 
-                    ผู้ใช้งานควรศึกษาก่อนการลงทุน ผู้พัฒนาไม่รับผิดชอบต่อความเสียหายใดๆ ที่เกิดขึ้นจากการนำข้อมูลนี้ไปใช้
-                </div>
-                """, unsafe_allow_html=True)
-
-                col_tech, col_act = st.columns(2)
-                with col_tech:
-                    st.info(f"**🏗️ Market Structure:**\n\n{ai_report['technical']['structure']}")
-                    st.info(f"**📊 Indicator Status:**\n\n{ai_report['technical']['status']}")
-                
-                with col_act:
-                    st.success(f"{ai_report['action']['strategy']}")
-                    for step in ai_report['action']['steps']:
-                        st.write(f"- {step}")
-                
-                # เปลี่ยนหัวข้อ Context เป็น "มุมมอง" ตามคำสั่งเดิม
-                st.warning(f"**💡 มุมมอง (Perspective):**\n\n{ai_report['context']}")
-                
-                st.markdown("---")
-                adx_exp, rsi_exp, macd_exp = get_detailed_explanation(adx_val, rsi, macd_val, macd_signal, price, ema200)
-                st.markdown(f"#### 📝 คำอธิบายภาษาคน (Explained):\n* **เทรนด์ (ADX):** {adx_exp}\n* **ความถูกแพง (RSI):** {rsi_exp}\n* **แรงส่ง (MACD):** {macd_exp}")
-                
-                st.markdown("---")
-                display_learning_section(rsi, get_rsi_interpretation(rsi), macd_val, macd_signal, "ดูโมเมนตัม", adx_val, get_adx_interpretation(adx_val), price, bb_upper, bb_lower)
-            
-            else:
-                st.error(f"❌ ไม่พบข้อมูลหุ้น {symbol_input} หรือข้อมูลไม่เพียงพอ (ตลาดอาจปิดหรือชื่อหุ้นผิด)")
-        
-        if not realtime_mode: break
-        time.sleep(10)
+                icon_up_svg = """<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fil
