@@ -76,34 +76,34 @@ def arrow_html(change):
     if change is None: return ""
     return "<span style='color:#16a34a;font-weight:600'>▲</span>" if change > 0 else "<span style='color:#dc2626;font-weight:600'>▼</span>"
 
-def custom_metric_html(label, value, delta_text, color_status, icon_svg):
+def custom_metric_html(label, value, status_text, color_status, icon_svg):
     if color_status == "green": color_code = "#16a34a"
     elif color_status == "red": color_code = "#dc2626"
     else: color_code = "#6b7280"
     
-    # 2. ✅ UPDATE: ลบ color: ... ออกจาก Label และ Value เพื่อให้ Streamlit ปรับสีตาม Dark/Light Mode อัตโนมัติ
+    # 3. ✅ UPDATE: ปรับ Layout ให้หัวข้อและค่าอยู่บรรทัดเดียวกัน และขยายขนาด
     html = f"""
-    <div style="font-family: 'Source Sans Pro', sans-serif; margin-bottom: 10px;">
-        <div style="font-size: 14px; margin-bottom: 4px; opacity: 0.7;">{label}</div>
-        <div style="font-size: 32px; font-weight: 600; line-height: 1.2;">{value}</div>
-        <div style="display: flex; align-items: center; gap: 8px; font-size: 16px; font-weight: 500; color: {color_code}; margin-top: 4px;">
-            <div style="display: flex; align-items: center; justify-content: center; width: 24px; height: 24px;">
-                {icon_svg}
-            </div>
-            <span>{delta_text}</span>
+    <div style="margin-bottom: 15px;">
+        <div style="display: flex; align-items: baseline; gap: 10px; margin-bottom: 5px;">
+            <div style="font-size: 18px; font-weight: 700; opacity: 0.9; color: var(--text-color); white-space: nowrap;">{label}</div>
+            <div style="font-size: 24px; font-weight: 700; color: var(--text-color);">{value}</div>
+        </div>
+        <div style="display: flex; align-items: start; gap: 6px; font-size: 15px; font-weight: 600; color: {color_code}; line-height: 1.4;">
+            <div style="margin-top: 3px; min-width: 24px;">{icon_svg}</div>
+            <div>{status_text}</div>
         </div>
     </div>
     """
     return html
 
 def get_rsi_interpretation(rsi):
-    if rsi >= 80: return "🔴 **Extreme Overbought (80+):** แรงซื้อบ้าคลั่ง ระวังการเทขายรุนแรง"
-    elif rsi >= 70: return "🟠 **Overbought (70-80):** ราคาเริ่มตึงตัว อาจมีการเทขายพักฐานเร็วๆ นี้"
-    elif rsi >= 55: return "🟢 **Bullish Zone (55-70):** โมเมนตัมกระทิงครองตลาด ราคาแข็งแกร่ง"
-    elif rsi >= 45: return "⚪ **Sideway/Neutral (45-55):** แรงซื้อขายก้ำกึ่ง รอเลือกทางที่ชัดเจน"
-    elif rsi >= 30: return "🟠 **Bearish Zone (30-45):** โมเมนตัมหมีครองตลาด ระวังราคาไหลลงต่อ"
-    elif rsi > 20: return "🟢 **Oversold (20-30):** ขายมากเกินไป เริ่มเข้าเขต 'ของถูก' ลุ้นเด้งรีบาวด์"
-    else: return "🟢 **Extreme Oversold (<20):** ลงลึกมาก Panic Sell จบแล้ว"
+    if rsi >= 80: return "Extreme Overbought (80+): ระวังแรงขายรุนแรง"
+    elif rsi >= 70: return "Overbought (70-80): ราคาตึงตัว อาจพักฐาน"
+    elif rsi >= 55: return "Bullish Zone (55-70): โมเมนตัมกระทิงแข็งแกร่ง"
+    elif rsi >= 45: return "Sideway/Neutral (45-55): รอเลือกทาง"
+    elif rsi >= 30: return "Bearish Zone (30-45): โมเมนตัมหมีครองตลาด"
+    elif rsi > 20: return "Oversold (20-30): เริ่มเข้าเขตของถูก"
+    else: return "Extreme Oversold (<20): ลงลึกมาก ลุ้นเด้ง"
 
 def get_rsi_short_label(rsi):
     if rsi >= 70: return "Overbought"
@@ -113,16 +113,16 @@ def get_rsi_short_label(rsi):
     else: return "Oversold"
 
 def get_pe_interpretation(pe):
-    if isinstance(pe, str) and pe == 'N/A': return "⚪ N/A"
-    if pe < 0: return "🔴 ขาดทุน"
-    if pe < 15: return "🟢 หุ้นถูก (Value)"
-    if pe < 30: return "🟡 ราคาเหมาะสม"
-    return "🟠 หุ้นแพง (Growth)"
+    if isinstance(pe, str) and pe == 'N/A': return "N/A"
+    if pe < 0: return "ขาดทุน (Loss)"
+    if pe < 15: return "หุ้นถูก (Value)"
+    if pe < 30: return "ราคาเหมาะสม (Fair)"
+    return "หุ้นแพง (Growth)"
 
 def get_adx_interpretation(adx):
-    if adx >= 50: return "🚀 **Super Strong Trend:** เทรนด์แรงมาก (ระวังจุดพีค)"
-    if adx >= 25: return "💪 **Strong Trend:** มีเทรนด์ชัดเจน (น่าติดตาม)"
-    return "💤 **Weak Trend/Sideway:** ตลาดไร้ทิศทาง (แกว่งตัว)"
+    if adx >= 50: return "Super Strong Trend: เทรนด์แรงมาก (ระวังจุดพีค)"
+    if adx >= 25: return "Strong Trend: มีเทรนด์ชัดเจน (น่าติดตาม)"
+    return "Weak Trend/Sideway: ตลาดไร้ทิศทาง (แกว่งตัว)"
 
 def get_detailed_explanation(adx, rsi, macd_val, macd_signal, price, ema200):
     if adx >= 50: adx_str = "ระดับ 'รุนแรงมาก' (Super Strong)"
@@ -417,12 +417,9 @@ if submit_btn:
 
                 # --- Metrics Section (ใช้ Custom HTML และ SVG Icon) ---
                 c3, c4, c5 = st.columns(3)
-                with c3:
-                    st.metric("📊 P/E Ratio", f"{info['trailingPE']:.2f}" if isinstance(info['trailingPE'], (int,float)) else "N/A")
-                    st.caption(get_pe_interpretation(info['trailingPE']))
                 
                 # --- SVG Definitions ---
-                # ลูกศรขึ้น/ลง (คงเดิมตามที่สั่ง ไม่แก้ไข)
+                # ลูกศรขึ้น/ลง
                 icon_up_svg = """<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#16a34a" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5"/><path d="M5 12l7-7 7 7"/></svg>"""
                 icon_down_svg = """<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#dc2626" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14"/><path d="M5 12l7 7 7-7"/></svg>"""
                 icon_flat_svg = """<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="#6b7280"><circle cx="12" cy="12" r="10"/></svg>"""
@@ -430,27 +427,42 @@ if submit_btn:
                 # 3. ✅ UPDATE: เปลี่ยนไอคอน Sideway เป็นลูกศรสองหัว (Double Arrow) สีเทา
                 icon_wave_svg = """<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#6b7280" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 15l3-3-3-3"/><path d="M6 9l-3 3 3 3"/><path d="M21 12H3"/></svg>"""
 
-                # Custom RSI Metric
+                # 1. P/E Ratio (UPDATE: ใช้ Custom HTML เพื่อความสวยงามเหมือน RSI/ADX)
+                with c3:
+                    pe_val = info['trailingPE']
+                    pe_str = f"{pe_val:.2f}" if isinstance(pe_val, (int, float)) else "N/A"
+                    pe_interp = get_pe_interpretation(pe_val)
+                    
+                    if isinstance(pe_val, (int,float)):
+                        if pe_val < 0: pe_color = "red"; pe_icon = icon_down_svg
+                        elif pe_val < 15: pe_color = "green"; pe_icon = icon_up_svg
+                        elif pe_val < 30: pe_color = "green"; pe_icon = icon_flat_svg # Fair = Greenish/Neutral
+                        else: pe_color = "red"; pe_icon = icon_down_svg
+                    else:
+                        pe_color = "gray"; pe_icon = icon_flat_svg
+                        
+                    st.markdown(custom_metric_html("📊 P/E Ratio", pe_str, pe_interp, pe_color, pe_icon), unsafe_allow_html=True)
+
+                # 2. RSI Metric (UPDATE: รวม Description เข้าไปใน status line)
                 with c4:
-                    rsi_short_lbl = get_rsi_short_label(rsi)
-                    if rsi >= 70: c_stat = "red"; icon_final = icon_up_svg
+                    rsi_interp = get_rsi_interpretation(rsi) # Get full text
+                    if rsi >= 70: c_stat = "red"; icon_final = icon_up_svg # Overbought
                     elif rsi >= 55: c_stat = "green"; icon_final = icon_up_svg
                     elif rsi >= 45: c_stat = "gray"; icon_final = icon_flat_svg
                     elif rsi >= 30: c_stat = "red"; icon_final = icon_down_svg
                     else: c_stat = "green"; icon_final = icon_down_svg
-                    st.markdown(custom_metric_html("⚡ RSI (14)", f"{rsi:.2f}", rsi_short_lbl, c_stat, icon_final), unsafe_allow_html=True)
-                    st.caption(get_rsi_interpretation(rsi))
+                    
+                    st.markdown(custom_metric_html("⚡ RSI (14)", f"{rsi:.2f}", rsi_interp, c_stat, icon_final), unsafe_allow_html=True)
 
-                # Custom ADX Metric
+                # 3. ADX Metric (UPDATE: รวม Description เข้าไปใน status line)
                 with c5:
+                    adx_interp = get_adx_interpretation(adx_val)
                     if adx_val > 25:
                         c_stat = "green"; icon_final = icon_up_svg
-                        lbl_text = "Strong Trend"
                     else:
-                        c_stat = "gray"; icon_final = icon_wave_svg # <-- ใช้ไอคอนใหม่ที่นี่
-                        lbl_text = "Weak/Sideway"
-                    st.markdown(custom_metric_html("💪 ADX Strength", f"{adx_val:.2f}", lbl_text, c_stat, icon_final), unsafe_allow_html=True)
-                    st.caption(get_adx_interpretation(adx_val))
+                        c_stat = "gray"; icon_final = icon_wave_svg
+                    
+                    st.markdown(custom_metric_html("💪 ADX Strength", f"{adx_val:.2f}", adx_interp, c_stat, icon_final), unsafe_allow_html=True)
 
                 st.write("") 
 
