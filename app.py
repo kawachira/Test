@@ -81,10 +81,11 @@ def custom_metric_html(label, value, delta_text, color_status, icon_svg):
     elif color_status == "red": color_code = "#dc2626"
     else: color_code = "#6b7280"
     
+    # 2. ✅ UPDATE: ลบ color: ... ออกจาก Label และ Value เพื่อให้ Streamlit ปรับสีตาม Dark/Light Mode อัตโนมัติ
     html = f"""
     <div style="font-family: 'Source Sans Pro', sans-serif; margin-bottom: 10px;">
-        <div style="font-size: 14px; color: rgba(49, 51, 63, 0.6); margin-bottom: 4px;">{label}</div>
-        <div style="font-size: 32px; font-weight: 600; color: rgb(49, 51, 63); line-height: 1.2;">{value}</div>
+        <div style="font-size: 14px; margin-bottom: 4px; opacity: 0.7;">{label}</div>
+        <div style="font-size: 32px; font-weight: 600; line-height: 1.2;">{value}</div>
         <div style="display: flex; align-items: center; gap: 8px; font-size: 16px; font-weight: 500; color: {color_code}; margin-top: 4px;">
             <div style="display: flex; align-items: center; justify-content: center; width: 24px; height: 24px;">
                 {icon_svg}
@@ -354,7 +355,7 @@ if submit_btn:
                         arrow = "▲" if change >= 0 else "▼"
                         return f'<span style="background:{bg}; color:{color}; padding: 4px 10px; border-radius: 12px; font-size: 16px; font-weight: 600; margin-left: 8px;">{arrow} {change:+.2f} ({percent:.2f}%)</span>'
 
-                    # 1. สร้าง HTML ส่วน OHLC ก่อน (ให้สีเป็นสีปกติของ Theme ไม่ fix สีเขียว/แดง)
+                    # 1. สร้าง HTML ส่วน OHLC (1. ✅ UPDATE: ขนาดอักษรเท่า Pre/Post และ สีตัวเลขตามราคา)
                     ohlc_html = ""
                     m_state = info.get('marketState', '').upper()
                     if m_state != "REGULAR": 
@@ -364,24 +365,28 @@ if submit_btn:
                         d_close = info.get('regularMarketPrice')
                         
                         if d_open and d_high and d_low and d_close:
-                            # ใช้ฟอนต์หนา และไม่ใส่สี (inherit ตาม Theme)
+                            # คำนวณสีตัวเลข (เขียว/แดง) ตาม Change ของวัน
+                            day_chg = info.get('regularMarketChange', 0)
+                            val_color = "#16a34a" if day_chg >= 0 else "#dc2626"
+                            
+                            # Label (O,H,L,C): ไม่ใส่สี (inherit ตาม Theme)
+                            # Value (ตัวเลข): ใส่สีตาม val_color
                             ohlc_html = f"""
-                            <div style="font-size: 18px; font-weight: 600; margin-bottom: 8px; font-family: 'Source Sans Pro', sans-serif;">
-                                <span style="margin-right: 12px;">O {d_open:.2f}</span>
-                                <span style="margin-right: 12px;">H {d_high:.2f}</span>
-                                <span style="margin-right: 12px;">L {d_low:.2f}</span>
-                                <span>C {d_close:.2f}</span>
+                            <div style="font-size: 16px; font-weight: 600; margin-bottom: 8px; font-family: 'Source Sans Pro', sans-serif;">
+                                <span style="margin-right: 10px; opacity: 0.8;">O</span> <span style="color: {val_color}; margin-right: 15px;">{d_open:.2f}</span>
+                                <span style="margin-right: 10px; opacity: 0.8;">H</span> <span style="color: {val_color}; margin-right: 15px;">{d_high:.2f}</span>
+                                <span style="margin-right: 10px; opacity: 0.8;">L</span> <span style="color: {val_color}; margin-right: 15px;">{d_low:.2f}</span>
+                                <span style="margin-right: 10px; opacity: 0.8;">C</span> <span style="color: {val_color};">{d_close:.2f}</span>
                             </div>
                             """
 
-                    # 2. สร้าง HTML ส่วน Pre/Post Market (คำนวณ % ใหม่เอง)
+                    # 2. สร้าง HTML ส่วน Pre/Post Market
                     pre_post_html = ""
                     
                     # Pre Market
                     if info.get('preMarketPrice') and info.get('preMarketChange'):
                         p = info['preMarketPrice']
                         c = info['preMarketChange']
-                        # คำนวณ % ใหม่: (Change / (Current - Change)) * 100
                         prev_p = p - c
                         pct = (c / prev_p) * 100 if prev_p != 0 else 0
                         pre_post_html += f'<div style="margin-bottom: 6px; font-size: 16px;">☀️ Pre: <b>{p:.2f}</b> {make_pill(c, pct)}</div>'
@@ -390,12 +395,11 @@ if submit_btn:
                     if info.get('postMarketPrice') and info.get('postMarketChange'):
                          p = info['postMarketPrice']
                          c = info['postMarketChange']
-                         # คำนวณ % ใหม่
                          prev_p = p - c
                          pct = (c / prev_p) * 100 if prev_p != 0 else 0
                          pre_post_html += f'<div style="margin-bottom: 6px; font-size: 16px;">🌙 Post: <b>{p:.2f}</b> {make_pill(c, pct)}</div>'
 
-                    # แสดงผล: OHLC ขึ้นก่อน แล้วตามด้วย Pre/Post
+                    # แสดงผล
                     if ohlc_html or pre_post_html:
                         st.markdown(f'<div style="margin-top: 10px;">{ohlc_html}{pre_post_html}</div>', unsafe_allow_html=True)
                     # -----------------------------------------------------------
@@ -516,8 +520,14 @@ if submit_btn:
                         st.markdown(f"### 🎯 {ai_report['action']['strategy']}")
                         for step in ai_report['action']['steps']: st.write(f"- {step}")
                         st.markdown("---")
-                        # 4. ✅ UPDATE: เปลี่ยน Context เป็น มุมมอง
-                        st.caption(f"มุมมอง: {ai_report['context']}")
+                        
+                        # 4. ✅ UPDATE: ทำให้ "มุมมอง" เด่นขึ้น (ใช้ Custom HTML Box แทน st.caption)
+                        st.markdown(f"""
+                        <div style="margin-top: 15px; padding: 15px; background-color: var(--secondary-background-color); border-radius: 8px; border-left: 5px solid #6366f1;">
+                            <h4 style="margin: 0 0 5px 0; color: var(--text-color);">👁️ มุมมอง (Perspective)</h4>
+                            <p style="margin: 0; font-size: 1.1rem; color: var(--text-color); opacity: 0.9;">{ai_report['context']}</p>
+                        </div>
+                        """, unsafe_allow_html=True)
 
                 st.write("")
                 # 5. ✅ UPDATE: เพิ่มกล่องหมายเหตุ (Disclaimer)
