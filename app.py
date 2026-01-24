@@ -8,7 +8,7 @@ import time
 # --- 1. ตั้งค่าหน้าเว็บ ---
 st.set_page_config(page_title="AI Stock Master", page_icon="💎", layout="wide")
 
-# --- 2. CSS ปรับแต่ง (UPDATE: แก้ไขเรื่องหัวข้อหาย และเพิ่มการล็อคหน้าจอ) ---
+# --- 2. CSS ปรับแต่ง ---
 st.markdown("""
     <style>
     /* 2. ✅ ล็อคการเลื่อนหน้าจอในตอนเริ่มต้น */
@@ -51,7 +51,6 @@ st.markdown("""
 
 # --- 3. ส่วนหัวข้อ ---
 st.markdown("<h1>💎 Ai<br><span style='font-size: 1.5rem; opacity: 0.7;'>ระบบวิเคราะห์หุ้นอัจฉริยะ</span></h1>", unsafe_allow_html=True)
-# ลบ st.write("") ออกเพื่อให้ชิดกับช่องค้นหาตาม CSS ที่ตั้งใหม่
 
 # --- Form ค้นหา ---
 col_space1, col_form, col_space2 = st.columns([1, 2, 1])
@@ -124,24 +123,7 @@ def get_adx_interpretation(adx):
     return "💤 **Weak Trend/Sideway:** ตลาดไร้ทิศทาง (แกว่งตัว)"
 
 def get_detailed_explanation(adx, rsi, macd_val, macd_signal, price, ema200):
-    if adx >= 50: adx_str = "ระดับ 'รุนแรงมาก' (Super Strong)"
-    elif adx >= 25: adx_str = "ระดับ 'แข็งแกร่ง' (Strong)"
-    elif adx >= 20: adx_str = "ระดับ 'กำลังก่อตัว' (Developing)"
-    else: adx_str = "ระดับ 'อ่อนแอ/ไม่มีเทรนด์' (Weak)"
-    
-    if price > ema200: trend_dir = "ขาขึ้น (Uptrend)"
-    else: trend_dir = "ขาลง (Downtrend)"
-        
-    adx_explain = f"ค่า **{adx:.2f}** อยู่ใน{adx_str} เมื่อรวมกับทิศทางที่เป็น **{trend_dir}** จึงสรุปได้ว่าตลาดกำลังมี **{trend_dir} ที่{adx_str.split("'")[1]}**"
-
-    if rsi >= 70: rsi_explain = f"ค่า **{rsi:.2f}** สูงเกิน 70 แปลว่าราคา **'แพงเกินไป' (Overbought)** คนแห่ซื้อกันจนเสี่ยงที่จะโดนเทขาย"
-    elif rsi <= 30: rsi_explain = f"ค่า **{rsi:.2f}** ต่ำกว่า 30 แปลว่าราคา **'ถูกเกินไป' (Oversold)** คนแห่ขายจนน่าจะมีแรงซื้อสวนกลับมา"
-    else: rsi_explain = f"ค่า **{rsi:.2f}** อยู่ในช่วงกลางๆ (40-60) แปลว่าราคาสมเหตุสมผล ไม่ถูกและไม่แพงเกินไป"
-
-    if macd_val > macd_signal: macd_explain = f"ค่า **{macd_val:.3f}** ตัดขึ้นเหนือเส้น Signal แปลว่า **'แรงซื้อชนะแรงขาย'** โมเมนตัมเป็นบวก"
-    else: macd_explain = f"ค่า **{macd_val:.3f}** ตัดลงต่ำกว่าเส้น Signal แปลว่า **'แรงขายชนะแรงซื้อ'** โมเมนตัมเป็นลบ"
-
-    return adx_explain, rsi_explain, macd_explain
+    pass # ฟังก์ชันนี้ไม่ได้ถูกเรียกใช้ในส่วนแสดงผลหลัก แต่เก็บไว้ไม่ลบตามคำสั่ง
 
 def display_learning_section(rsi, rsi_interp, macd_val, macd_signal, macd_interp, adx_val, adx_interp, price, bb_upper, bb_lower):
     st.markdown("### 📘 มุมความรู้: ค่าต่างๆ คืออะไร? มาจากไหน?")
@@ -305,7 +287,7 @@ if submit_btn:
                 
                 ai_report = analyze_market_structure(price, ema20, ema50, ema200, rsi, macd_val, macd_signal, adx_val, bb_upper, bb_lower)
 
-                # --- 🔴 LOGO UPDATE START (วิธีใหม่: ดึงจากชื่อหุ้น + กันภาพเสีย) ---
+                # --- 🔴 ส่วนที่เพิ่ม: โลโก้หุ้น (ตามคำสั่ง) ---
                 logo_url = f"https://financialmodelingprep.com/image-stock/{symbol_input}.png"
                 fallback_url = "https://cdn-icons-png.flaticon.com/512/720/720453.png"
 
@@ -317,10 +299,11 @@ if submit_btn:
                             object-fit: contain; background-color: white; 
                             border: 1px solid #e0e0e0; padding: 2px;">
                 """
-                # --- 🔴 LOGO UPDATE END ---
+                # ---------------------------------------------
 
                 st.markdown(f"<h2 style='text-align: center; margin-top: -15px; margin-bottom: 25px;'>{icon_html} {info['longName']} ({symbol_input})</h2>", unsafe_allow_html=True)
                 
+                # --- ส่วนแสดงราคาและข้อมูลที่ขาดหายไป (กู้คืนกลับมาแล้ว) ---
                 c1, c2 = st.columns(2)
                 with c1:
                     reg_price, reg_chg = info.get('regularMarketPrice'), info.get('regularMarketChange')
@@ -367,15 +350,14 @@ if submit_btn:
                     st.caption(get_pe_interpretation(info['trailingPE']))
                 
                 # --- SVG Definitions ---
-                # ลูกศรขึ้น/ลง (คงเดิมตามที่สั่ง ไม่แก้ไข)
                 icon_up_svg = """<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#16a34a" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5"/><path d="M5 12l7-7 7 7"/></svg>"""
                 icon_down_svg = """<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#dc2626" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14"/><path d="M19 12l-7 7-7-7"/></svg>"""
                 
                 with c4:
-                    rsi_delta = rsi - 50 # เทียบกับค่ากลาง
+                    rsi_delta = rsi - 50 
                     rsi_color = "green" if rsi < 30 or rsi > 70 else "gray"
-                    if rsi > 70: rsi_icon = icon_down_svg # Overbought ระวังลง
-                    elif rsi < 30: rsi_icon = icon_up_svg # Oversold ลุ้นขึ้น
+                    if rsi > 70: rsi_icon = icon_down_svg 
+                    elif rsi < 30: rsi_icon = icon_up_svg 
                     else: rsi_icon = '<span style="font-size:20px">➖</span>'
                     
                     st.markdown(custom_metric_html("⚡ RSI (14)", f"{rsi:.2f}", get_rsi_short_label(rsi), rsi_color, rsi_icon), unsafe_allow_html=True)
@@ -395,14 +377,13 @@ if submit_btn:
                 # --- AI Analysis Box ---
                 st.subheader(f"🤖 AI Technical Analysis ({tf_label})")
                 
-                # กล่องสรุปสีตามสถานะ
                 if st_color == "green":
                     box_bg = "#dcfce7"; box_border = "#16a34a"; text_head = "#14532d"
                 elif st_color == "red":
                     box_bg = "#fee2e2"; box_border = "#dc2626"; text_head = "#7f1d1d"
                 elif st_color == "orange":
                     box_bg = "#ffedd5"; box_border = "#f97316"; text_head = "#7c2d12"
-                else: # yellow
+                else: 
                     box_bg = "#fef9c3"; box_border = "#eab308"; text_head = "#713f12"
 
                 st.markdown(f"""
