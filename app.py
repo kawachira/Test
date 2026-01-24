@@ -346,33 +346,53 @@ if submit_btn:
                     </div>
                     """, unsafe_allow_html=True)
                     
-                    pre_p, pre_c = info.get('preMarketPrice'), info.get('preMarketChange')
-                    post_p, post_c = info.get('postMarketPrice'), info.get('postMarketChange')
-                    if pre_p and pre_c: st.caption(f"☀️ Pre: {pre_p} ({pre_c:+.2f})")
-                    if post_p and post_c: st.caption(f"🌙 Post: {post_p} ({post_c:+.2f})")
-                    
-                    # --- UPDATE: OHLC Data (Show only when market is closed) ---
-                    m_state = info.get('marketState', '').upper()
-                    # แสดงเฉพาะเมื่อตลาดปิด (ไม่ใช่ REGULAR)
-                    if m_state != "REGULAR": 
-                        d_open = info.get('regularMarketOpen')
-                        d_high = info.get('dayHigh')
-                        d_low = info.get('dayLow')
-                        d_close = info.get('regularMarketPrice')
+                    # --- UPDATE NEW: Pre/Post Market + OHLC (Flexbox Layout) ---
+                    extra_info_html = ""
+
+                    # Helper function สร้าง Pill สีเขียว/แดง
+                    def make_pill(change, percent):
+                        color = "#16a34a" if change >= 0 else "#dc2626"
+                        bg = "#e8f5ec" if change >= 0 else "#fee2e2"
+                        arrow = "▲" if change >= 0 else "▼"
+                        # คำนวณ % ใหม่ถ้าของเดิมไม่มี
+                        return f'<span style="background:{bg}; color:{color}; padding: 2px 8px; border-radius: 8px; font-size: 14px; font-weight: 500;">{arrow} {change:+.2f} ({percent:.2f}%)</span>'
+
+                    # 1. Pre Market Logic
+                    if info.get('preMarketPrice') and info.get('preMarketChange'):
+                        p = info['preMarketPrice']
+                        c = info['preMarketChange']
+                        pct = info.get('preMarketChangePercent', 0) * 100
+                        # ถ้า yfinance ไม่ส่ง % มา ให้คำนวณเอง
+                        if pct == 0 and (p - c) != 0: pct = (c / (p - c)) * 100
                         
-                        if d_open and d_high and d_low and d_close:
-                            # เช็คว่าหุ้นบวกหรือลบ (เทียบจาก Change ของวัน)
-                            day_change = info.get('regularMarketChange', 0)
-                            ohlc_color = "#16a34a" if day_change >= 0 else "#dc2626"
-                            
-                            st.markdown(f"""
-                            <div style="color: {ohlc_color}; font-size: 16px; font-weight: 500; margin-top: 4px; font-family: 'Source Sans Pro', sans-serif;">
-                                <span style="margin-right: 8px;">O {d_open:.2f}</span>
-                                <span style="margin-right: 8px;">H {d_high:.2f}</span>
-                                <span style="margin-right: 8px;">L {d_low:.2f}</span>
-                                <span>C {d_close:.2f}</span>
-                            </div>
-                            """, unsafe_allow_html=True)
+                        extra_info_html += f'<div style="margin-right: 15px;">☀️ Pre: <b>{p:.2f}</b> {make_pill(c, pct)}</div>'
+
+                    # 2. Post Market Logic
+                    if info.get('postMarketPrice') and info.get('postMarketChange'):
+                         p = info['postMarketPrice']
+                         c = info['postMarketChange']
+                         pct = info.get('postMarketChangePercent', 0) * 100
+                         if pct == 0 and (p - c) != 0: pct = (c / (p - c)) * 100
+
+                         extra_info_html += f'<div style="margin-right: 15px;">🌙 Post: <b>{p:.2f}</b> {make_pill(c, pct)}</div>'
+                    
+                    # 3. OHLC Logic (แสดงเฉพาะตลาดปิด และใช้ Flexbox ให้ต่อท้าย)
+                    m_state = info.get('marketState', '').upper()
+                    if m_state != "REGULAR":
+                         d_open = info.get('regularMarketOpen')
+                         d_high = info.get('dayHigh')
+                         d_low = info.get('dayLow')
+                         d_close = info.get('regularMarketPrice')
+                         
+                         if d_open and d_high and d_low and d_close:
+                             day_chg = info.get('regularMarketChange', 0)
+                             # สีตัวอักษรตามสถานะวันนั้น
+                             c_text = "#16a34a" if day_chg >= 0 else "#dc2626"
+                             ohlc_html = f'<span style="color:{c_text}; font-weight:600; white-space: nowrap;">O: {d_open:.2f} H: {d_high:.2f} L: {d_low:.2f} C: {d_close:.2f}</span>'
+                             extra_info_html += f'<div>{ohlc_html}</div>'
+
+                    # แสดงผลรวมกันในบรรทัดเดียว (ถ้าพอ) ด้วย Flexbox
+                    st.markdown(f'<div style="display:flex; flex-wrap:wrap; align-items:center; margin-top:5px; font-size:16px; font-family: \'Source Sans Pro\', sans-serif;">{extra_info_html}</div>', unsafe_allow_html=True)
                     # -----------------------------------------------------------
 
                 if tf_code == "1h": tf_label = "TF Hour"
