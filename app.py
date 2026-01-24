@@ -162,10 +162,8 @@ def get_data(symbol, interval):
         period_val = "730d" if interval == "1h" else "10y"
         df = ticker.history(period=period_val, interval=interval)
         
-        # --- UPDATE: เพิ่มการดึง Website เพื่อนำมาทำ Logo ---
         stock_info = {
             'longName': ticker.info.get('longName', symbol),
-            'website': ticker.info.get('website'), # <--- เพิ่มบรรทัดนี้
             'trailingPE': ticker.info.get('trailingPE', 'N/A'),
             'regularMarketPrice': ticker.info.get('regularMarketPrice'),
             'regularMarketChange': ticker.info.get('regularMarketChange'),
@@ -307,18 +305,19 @@ if submit_btn:
                 
                 ai_report = analyze_market_structure(price, ema20, ema50, ema200, rsi, macd_val, macd_signal, adx_val, bb_upper, bb_lower)
 
-                # --- UPDATE START: คำนวณหา URL โลโก้ ---
-                icon_html = "🏢" # ค่าเริ่มต้น (ตึก)
-                if info.get('website'):
-                    try:
-                        # ดึงชื่อ Domain (เช่น tesla.com) จาก URL
-                        domain = info['website'].replace("https://", "").replace("http://", "").replace("www.", "").split("/")[0]
-                        logo_url = f"https://logo.clearbit.com/{domain}"
-                        # สร้างแท็ก img ทรงกลมตามภาพตัวอย่าง
-                        icon_html = f'<img src="{logo_url}" style="height: 50px; width: 50px; border-radius: 50%; vertical-align: middle; margin-right: 10px; object-fit: contain; background-color: white;">'
-                    except:
-                        pass
-                # --- UPDATE END ---
+                # --- 🔴 LOGO UPDATE START (วิธีใหม่: ดึงจากชื่อหุ้น + กันภาพเสีย) ---
+                logo_url = f"https://financialmodelingprep.com/image-stock/{symbol_input}.png"
+                fallback_url = "https://cdn-icons-png.flaticon.com/512/720/720453.png"
+
+                icon_html = f"""
+                <img src="{logo_url}" 
+                     onerror="this.onerror=null; this.src='{fallback_url}';" 
+                     style="height: 50px; width: 50px; border-radius: 50%; 
+                            vertical-align: middle; margin-right: 10px; 
+                            object-fit: contain; background-color: white; 
+                            border: 1px solid #e0e0e0; padding: 2px;">
+                """
+                # --- 🔴 LOGO UPDATE END ---
 
                 st.markdown(f"<h2 style='text-align: center; margin-top: -15px; margin-bottom: 25px;'>{icon_html} {info['longName']} ({symbol_input})</h2>", unsafe_allow_html=True)
                 
@@ -370,4 +369,76 @@ if submit_btn:
                 # --- SVG Definitions ---
                 # ลูกศรขึ้น/ลง (คงเดิมตามที่สั่ง ไม่แก้ไข)
                 icon_up_svg = """<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#16a34a" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5"/><path d="M5 12l7-7 7 7"/></svg>"""
-                # ... (ส่วนท้ายของโค้ดคงเดิม)
+                icon_down_svg = """<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#dc2626" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14"/><path d="M19 12l-7 7-7-7"/></svg>"""
+                
+                with c4:
+                    rsi_delta = rsi - 50 # เทียบกับค่ากลาง
+                    rsi_color = "green" if rsi < 30 or rsi > 70 else "gray"
+                    if rsi > 70: rsi_icon = icon_down_svg # Overbought ระวังลง
+                    elif rsi < 30: rsi_icon = icon_up_svg # Oversold ลุ้นขึ้น
+                    else: rsi_icon = '<span style="font-size:20px">➖</span>'
+                    
+                    st.markdown(custom_metric_html("⚡ RSI (14)", f"{rsi:.2f}", get_rsi_short_label(rsi), rsi_color, rsi_icon), unsafe_allow_html=True)
+                    st.caption(get_rsi_interpretation(rsi))
+
+                with c5:
+                    macd_delta = macd_val - macd_signal
+                    macd_color = "green" if macd_delta > 0 else "red"
+                    macd_icon = icon_up_svg if macd_delta > 0 else icon_down_svg
+                    macd_text = "Bullish" if macd_delta > 0 else "Bearish"
+                    
+                    st.markdown(custom_metric_html("🌊 MACD Momentum", f"{macd_val:.3f}", macd_text, macd_color, macd_icon), unsafe_allow_html=True)
+                    st.caption(f"Signal: {macd_signal:.3f}")
+
+                st.markdown("---")
+                
+                # --- AI Analysis Box ---
+                st.subheader(f"🤖 AI Technical Analysis ({tf_label})")
+                
+                # กล่องสรุปสีตามสถานะ
+                if st_color == "green":
+                    box_bg = "#dcfce7"; box_border = "#16a34a"; text_head = "#14532d"
+                elif st_color == "red":
+                    box_bg = "#fee2e2"; box_border = "#dc2626"; text_head = "#7f1d1d"
+                elif st_color == "orange":
+                    box_bg = "#ffedd5"; box_border = "#f97316"; text_head = "#7c2d12"
+                else: # yellow
+                    box_bg = "#fef9c3"; box_border = "#eab308"; text_head = "#713f12"
+
+                st.markdown(f"""
+                <div style="background-color: {box_bg}; border-left: 6px solid {box_border}; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
+                    <h3 style="color: {text_head}; margin-top: 0;">{main_status}</h3>
+                    <p style="font-size: 1.1rem; margin-bottom: 10px;"><strong>โครงสร้างราคา:</strong> {ai_report['technical']['structure']}</p>
+                    <p style="font-size: 1.1rem; margin-bottom: 0;"><strong>สถานะอินดิเคเตอร์:</strong> {ai_report['technical']['status']}</p>
+                </div>
+                """, unsafe_allow_html=True)
+
+                c_left, c_right = st.columns([1, 1])
+                with c_left:
+                    st.info(f"**Context (สภาพแวดล้อม):**\n\n{ai_report['context']}")
+                with c_right:
+                    steps_html = "".join([f"<li>{s}</li>" for s in ai_report['action']['steps']])
+                    st.markdown(f"""
+                    <div style="background-color: #f0f9ff; border: 1px solid #bae6fd; padding: 15px; border-radius: 8px;">
+                        <strong style="color: #0369a1; font-size: 1.1rem;">{ai_report['action']['strategy']}</strong>
+                        <ul style="margin-top: 10px; margin-bottom: 0; padding-left: 20px; color: #0c4a6e;">
+                            {steps_html}
+                        </ul>
+                    </div>
+                    """, unsafe_allow_html=True)
+
+                st.divider()
+
+                # --- Learning Section ---
+                display_learning_section(rsi, get_rsi_interpretation(rsi), macd_val, macd_signal, 
+                                         "Bullish" if macd_val > macd_signal else "Bearish", 
+                                         adx_val, get_adx_interpretation(adx_val), price, bb_upper, bb_lower)
+                
+            else:
+                st.error(f"❌ ไม่พบข้อมูลหุ้น {symbol_input} หรือข้อมูลไม่เพียงพอ")
+                
+            if realtime_mode:
+                time.sleep(10)
+                st.rerun()
+            else:
+                break
