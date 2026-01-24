@@ -355,7 +355,7 @@ if submit_btn:
                         arrow = "▲" if change >= 0 else "▼"
                         return f'<span style="background:{bg}; color:{color}; padding: 4px 10px; border-radius: 12px; font-size: 16px; font-weight: 600; margin-left: 8px;">{arrow} {change:+.2f} ({percent:.2f}%)</span>'
 
-                    # 1. สร้าง HTML ส่วน OHLC (1. ✅ UPDATE: ขนาดอักษรเท่า Pre/Post และ สีตัวเลขตามราคา)
+                    # 1. สร้าง HTML ส่วน OHLC (1. ✅ UPDATE: ปรับขนาด font เป็น 14px เพื่อให้ไม่ใหญ่เกินไป)
                     ohlc_html = ""
                     m_state = info.get('marketState', '').upper()
                     if m_state != "REGULAR": 
@@ -372,7 +372,7 @@ if submit_btn:
                             # Label (O,H,L,C): ไม่ใส่สี (inherit ตาม Theme)
                             # Value (ตัวเลข): ใส่สีตาม val_color
                             ohlc_html = f"""
-                            <div style="font-size: 16px; font-weight: 600; margin-bottom: 8px; font-family: 'Source Sans Pro', sans-serif;">
+                            <div style="font-size: 14px; font-weight: 600; margin-bottom: 8px; font-family: 'Source Sans Pro', sans-serif;">
                                 <span style="margin-right: 10px; opacity: 0.8;">O</span> <span style="color: {val_color}; margin-right: 15px;">{d_open:.2f}</span>
                                 <span style="margin-right: 10px; opacity: 0.8;">H</span> <span style="color: {val_color}; margin-right: 15px;">{d_high:.2f}</span>
                                 <span style="margin-right: 10px; opacity: 0.8;">L</span> <span style="color: {val_color}; margin-right: 15px;">{d_low:.2f}</span>
@@ -521,13 +521,8 @@ if submit_btn:
                         for step in ai_report['action']['steps']: st.write(f"- {step}")
                         st.markdown("---")
                         
-                        # 4. ✅ UPDATE: ทำให้ "มุมมอง" เด่นขึ้น (ใช้ Custom HTML Box แทน st.caption)
-                        st.markdown(f"""
-                        <div style="margin-top: 15px; padding: 15px; background-color: var(--secondary-background-color); border-radius: 8px; border-left: 5px solid #6366f1;">
-                            <h4 style="margin: 0 0 5px 0; color: var(--text-color);">👁️ มุมมอง (Perspective)</h4>
-                            <p style="margin: 0; font-size: 1.1rem; color: var(--text-color); opacity: 0.9;">{ai_report['context']}</p>
-                        </div>
-                        """, unsafe_allow_html=True)
+                        # 4. ✅ UPDATE: ใช้ st.info เพื่อให้มุมมองดู "ขลัง" (ทางการ) และ "เด่น" (มีพื้นหลัง)
+                        st.info(f"**👁️ มุมมอง (Perspective):**\n\n{ai_report['context']}")
 
                 st.write("")
                 # 5. ✅ UPDATE: เพิ่มกล่องหมายเหตุ (Disclaimer)
