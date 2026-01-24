@@ -8,11 +8,13 @@ import time
 # --- 1. ตั้งค่าหน้าเว็บ ---
 st.set_page_config(page_title="AI Stock Master", page_icon="💎", layout="wide")
 
-# --- 2. CSS ปรับแต่ง ---
+# --- 2. CSS ปรับแต่ง (คงเดิมตามที่สั่ง) ---
 st.markdown("""
     <style>
-    .block-container { padding-top: 1rem !important; padding-bottom: 0rem !important; }
-    h1 { text-align: center; font-size: 2.8rem !important; margin-bottom: 10px; }
+    /* เพิ่ม padding ด้านล่าง เพื่อไม่ให้ปุ่ม Manage app บังเนื้อหา */
+    .block-container { padding-top: 1rem !important; padding-bottom: 5rem !important; }
+    /* ลด margin ด้านล่างของหัวข้อ เพื่อขยับช่องค้นหาขึ้น */
+    h1 { text-align: center; font-size: 2.8rem !important; margin-bottom: 5px; }
     div[data-testid="stForm"] {
         border: none; padding: 30px; border-radius: 20px;
         background-color: var(--secondary-background-color);
@@ -25,8 +27,8 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# --- 3. ส่วนหัวข้อ ---
-st.markdown("<h1>💎 Ai<br><span style='font-size: 1.5rem; opacity: 0.7;'>ระบบวิเคราะห์หุ้นอัจฉริยะ (Pro Icons)</span></h1>", unsafe_allow_html=True)
+# --- 3. ส่วนหัวข้อ (คงเดิมตามที่สั่ง) ---
+st.markdown("<h1>💎 Ai<br><span style='font-size: 1.5rem; opacity: 0.7;'>ระบบวิเคราะห์หุ้นอัจฉริยะ</span></h1>", unsafe_allow_html=True)
 st.write("")
 
 # --- Form ค้นหา ---
@@ -36,7 +38,8 @@ with col_form:
         st.markdown("### 🔍 ค้นหาหุ้นที่ต้องการ")
         c1, c2 = st.columns([3, 1])
         with c1:
-            symbol_input = st.text_input("ชื่อหุ้น (เช่น AMZN,EOSE,RKLB, TSLA):", value="EOSE").upper().strip()
+            # ค่าเริ่มต้นเป็นช่องว่าง (ตามที่สั่ง)
+            symbol_input = st.text_input("ชื่อหุ้น (เช่น AMZN,EOSE,RKLB, TSLA):", value="").upper().strip()
         with c2:
             timeframe = st.selectbox("Timeframe:", ["1h (รายชั่วโมง)", "1d (รายวัน)", "1wk (รายสัปดาห์)"], index=1)
             if "1wk" in timeframe: tf_code = "1wk"
@@ -52,20 +55,20 @@ def arrow_html(change):
     if change is None: return ""
     return "<span style='color:#16a34a;font-weight:600'>▲</span>" if change > 0 else "<span style='color:#dc2626;font-weight:600'>▼</span>"
 
-# --- UPDATED FUNCTION: สร้าง Metric รองรับ SVG Icon ---
+# --- NEW FUNCTION: สร้าง Metric แบบกำหนดไอคอน SVG เองได้ ---
 def custom_metric_html(label, value, delta_text, color_status, icon_svg):
     # กำหนดสี
     if color_status == "green": color_code = "#16a34a" # เขียว
     elif color_status == "red": color_code = "#dc2626"   # แดง
     else: color_code = "#6b7280"                         # เทา (Neutral)
     
-    # ปรับปรุง HTML ให้รองรับ SVG และจัดวางสวยงาม
+    # สร้าง HTML สำหรับแสดงผล
     html = f"""
     <div style="font-family: 'Source Sans Pro', sans-serif; margin-bottom: 10px;">
         <div style="font-size: 14px; color: rgba(49, 51, 63, 0.6); margin-bottom: 4px;">{label}</div>
         <div style="font-size: 32px; font-weight: 600; color: rgb(49, 51, 63); line-height: 1.2;">{value}</div>
         <div style="display: flex; align-items: center; gap: 8px; font-size: 16px; font-weight: 500; color: {color_code}; margin-top: 4px;">
-            <div style="display: flex; align-items: center; justify-content: center; width: 20px; height: 20px;">
+            <div style="display: flex; align-items: center; justify-content: center; width: 24px; height: 24px;">
                 {icon_svg}
             </div>
             <span>{delta_text}</span>
@@ -321,44 +324,50 @@ if submit_btn:
                 elif st_color == "red": c2.error(f"📉 {main_status}\n\n**{tf_label}**")
                 else: c2.warning(f"⚖️ {main_status}\n\n**{tf_label}**")
 
-                # --- Metrics Section (Modified for Custom SVG Arrows) ---
+                # --- Metrics Section (ใช้ Custom HTML และ SVG Icon ตามที่ขอ) ---
                 c3, c4, c5 = st.columns(3)
                 with c3:
                     st.metric("📊 P/E Ratio", f"{info['trailingPE']:.2f}" if isinstance(info['trailingPE'], (int,float)) else "N/A")
                     st.caption(get_pe_interpretation(info['trailingPE']))
                 
-                # --- DEFINE SVG ICONS (Modern Style) ---
-                icon_up_svg = """<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5"/><path d="m5 12 7-7 7 7"/></svg>"""
-                icon_down_svg = """<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14"/><path d="m19 12-7 7-7-7"/></svg>"""
-                icon_flat_svg = """<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="10"/></svg>"""
-                icon_wave_svg = """<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h18M3 6h18M3 18h18"/></svg>"""
+                # --- นิยามไอคอน SVG ---
+                # ลูกศรชี้ขึ้น (เขียว)
+                icon_up_svg = """<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#16a34a" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5"/><path d="m5 12 7-7 7 7"/></svg>"""
+                # ลูกศรชี้ลง (แดง)
+                icon_down_svg = """<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#dc2626" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14"/><path d="m19 12-7 7-7-7"/></svg>"""
+                # วงกลม (เทา)
+                icon_flat_svg = """<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="#6b7280"><circle cx="12" cy="12" r="10"/></svg>"""
+                
+                # --- ลูกศรคลื่น (เทา) - ใช้แบบที่ถูกต้องตามภาพ ---
+                icon_wave_svg = """<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#6b7280" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M 2 12 C 2 12, 4 16, 8 16 C 12 16, 12 8, 16 8 C 20 8, 22 12, 22 12"/><polyline points="5 9 2 12 5 15"/><polyline points="19 9 22 12 19 15"/></svg>"""
 
-                # Custom RSI Metric (With SVG)
+                # Custom RSI Metric (ใช้ SVG)
                 with c4:
                     rsi_short_lbl = get_rsi_short_label(rsi)
                     if rsi >= 70: 
-                        c_stat = "red"; icon = icon_up_svg # Overbought
+                        c_stat = "red"; icon_final = icon_up_svg # Overbought (แดง)
                     elif rsi >= 55: 
-                        c_stat = "green"; icon = icon_up_svg # Bullish
+                        c_stat = "green"; icon_final = icon_up_svg # Bullish (เขียว)
                     elif rsi >= 45: 
-                        c_stat = "gray"; icon = icon_flat_svg # Neutral
+                        c_stat = "gray"; icon_final = icon_flat_svg # Neutral (เทา)
                     elif rsi >= 30: 
-                        c_stat = "red"; icon = icon_down_svg # Bearish (ลงแดง)
+                        c_stat = "red"; icon_final = icon_down_svg # Bearish (ลงแดง)
                     else: 
-                        c_stat = "green"; icon = icon_down_svg # Oversold (ลงเขียว)
+                        c_stat = "green"; icon_final = icon_down_svg # Oversold (ลงเขียว)
                     
-                    st.markdown(custom_metric_html("⚡ RSI (14)", f"{rsi:.2f}", rsi_short_lbl, c_stat, icon), unsafe_allow_html=True)
+                    st.markdown(custom_metric_html("⚡ RSI (14)", f"{rsi:.2f}", rsi_short_lbl, c_stat, icon_final), unsafe_allow_html=True)
                     st.caption(get_rsi_interpretation(rsi))
 
-                # Custom ADX Metric (With SVG)
+                # Custom ADX Metric (ใช้ SVG คลื่น)
                 with c5:
-                    adx_lbl = "Strong Trend" if adx_val > 25 else "Weak/Sideway"
                     if adx_val > 25:
-                        c_stat = "green"; icon = icon_up_svg
+                        c_stat = "green"; icon_final = icon_up_svg
+                        lbl_text = "Strong Trend"
                     else:
-                        c_stat = "gray"; icon = icon_wave_svg # คลื่น
+                        c_stat = "gray"; icon_final = icon_wave_svg # <-- ใช้ไอคอนคลื่นที่ถูกต้อง
+                        lbl_text = "Weak/Sideway"
                         
-                    st.markdown(custom_metric_html("💪 ADX Strength", f"{adx_val:.2f}", adx_lbl, c_stat, icon), unsafe_allow_html=True)
+                    st.markdown(custom_metric_html("💪 ADX Strength", f"{adx_val:.2f}", lbl_text, c_stat, icon_final), unsafe_allow_html=True)
                     st.caption(get_adx_interpretation(adx_val))
 
                 st.write("") 
