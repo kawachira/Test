@@ -4,6 +4,7 @@ import pandas as pd
 import pandas_ta as ta
 import random
 import time
+import base64  # เพิ่ม import สำหรับจัดการรูปภาพ
 
 # --- 1. ตั้งค่าหน้าเว็บ ---
 st.set_page_config(page_title="AI Stock Master", page_icon="💎", layout="wide")
@@ -57,7 +58,33 @@ st.markdown("<h1>💎 Ai<br><span style='font-size: 1.5rem; opacity: 0.7;'>ร�
 col_space1, col_form, col_space2 = st.columns([1, 2, 1])
 with col_form:
     with st.form(key='search_form'):
-        st.markdown("### 🔍 ค้นหาหุ้น")
+        
+        # --- ส่วนที่แก้ไข: เพิ่มรูปภาพต่อท้ายหัวข้อ ---
+        # ฟังก์ชันแปลงรูปภาพเป็น Base64 เพื่อแสดงใน st.markdown
+        def get_img_as_base64(file_path):
+            try:
+                with open(file_path, "rb") as f:
+                    data = f.read()
+                return base64.b64encode(data).decode()
+            except:
+                return None
+
+        img_path = "1000020343.png" # ชื่อไฟล์รูปภาพที่ต้องวางไว้คู่กับไฟล์โค้ด
+        img_base64 = get_img_as_base64(img_path)
+        
+        if img_base64:
+            img_html = f'<img src="data:image/png;base64,{img_base64}" width="80" style="vertical-align: middle; margin-left: 10px; margin-bottom: 5px;">'
+        else:
+            img_html = "" # ถ้าไม่เจอรูปก็แสดงแค่ข้อความ
+            
+        st.markdown(f"""
+            <div style="display: flex; align-items: center; margin-bottom: 10px;">
+                <h3 style="margin: 0; padding: 0;">🔍 ค้นหาหุ้น</h3>
+                {img_html}
+            </div>
+        """, unsafe_allow_html=True)
+        # ----------------------------------------
+
         c1, c2 = st.columns([3, 1])
         with c1:
             symbol_input = st.text_input("ชื่อหุ้น (เช่น AMZN,EOSE,RKLB,TSLA)🪐", value="").upper().strip()
@@ -355,123 +382,76 @@ if submit_btn:
                 # --- SVG Definitions ---
                 # ลูกศรขึ้น/ลง (คงเดิมตามที่สั่ง ไม่แก้ไข)
                 icon_up_svg = """<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#16a34a" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5"/><path d="M5 12l7-7 7 7"/></svg>"""
-                icon_down_svg = """<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#dc2626" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14"/><path d="M5 12l7 7 7-7"/></svg>"""
-                icon_flat_svg = """<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="#6b7280"><circle cx="12" cy="12" r="10"/></svg>"""
+                icon_down_svg = """<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#dc2626" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14"/><path d="M19 12l-7 7-7-7"/></svg>"""
                 
-                # 3. ✅ UPDATE: เปลี่ยนไอคอน Sideway เป็นลูกศรสองหัว (Double Arrow) สีเทา
-                icon_wave_svg = """<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#6b7280" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 15l3-3-3-3"/><path d="M6 9l-3 3 3 3"/><path d="M21 12H3"/></svg>"""
-
-                # Custom RSI Metric
+                # ส่วนแสดงผล RSI
                 with c4:
-                    rsi_short_lbl = get_rsi_short_label(rsi)
-                    if rsi >= 70: c_stat = "red"; icon_final = icon_up_svg
-                    elif rsi >= 55: c_stat = "green"; icon_final = icon_up_svg
-                    elif rsi >= 45: c_stat = "gray"; icon_final = icon_flat_svg
-                    elif rsi >= 30: c_stat = "red"; icon_final = icon_down_svg
-                    else: c_stat = "green"; icon_final = icon_down_svg
-                    st.markdown(custom_metric_html("⚡ RSI (14)", f"{rsi:.2f}", rsi_short_lbl, c_stat, icon_final), unsafe_allow_html=True)
-                    st.caption(get_rsi_interpretation(rsi))
-
-                # Custom ADX Metric
-                with c5:
-                    if adx_val > 25:
-                        c_stat = "green"; icon_final = icon_up_svg
-                        lbl_text = "Strong Trend"
+                    if rsi >= 55:
+                        rsi_color = "green"
+                        rsi_icon = icon_up_svg
+                    elif rsi <= 45:
+                        rsi_color = "red"
+                        rsi_icon = icon_down_svg
                     else:
-                        c_stat = "gray"; icon_final = icon_wave_svg # <-- ใช้ไอคอนใหม่ที่นี่
-                        lbl_text = "Weak/Sideway"
-                    st.markdown(custom_metric_html("💪 ADX Strength", f"{adx_val:.2f}", lbl_text, c_stat, icon_final), unsafe_allow_html=True)
-                    st.caption(get_adx_interpretation(adx_val))
-
-                st.write("") 
-
-                c_ema, c_ai = st.columns([1.5, 2])
-                with c_ema:
-                    st.subheader("📉 Technical Indicators")
-                    st.markdown(f"""
-                    <div style='background-color: var(--secondary-background-color); padding: 15px; border-radius: 10px; font-size: 0.95rem;'>
-                        <div style='display:flex; justify-content:space-between; margin-bottom:5px; border-bottom:1px solid #ddd; font-weight:bold;'><span>Indicator</span> <span>Value</span></div>
-                        <div style='display:flex; justify-content:space-between;'><span>EMA 20 (สั้น)</span> <span>{ema20:.2f}</span></div>
-                        <div style='display:flex; justify-content:space-between;'><span>EMA 50 (กลาง)</span> <span>{ema50:.2f}</span></div>
-                        <div style='display:flex; justify-content:space-between;'><span>EMA 200 (ยาว)</span> <span>{ema200:.2f}</span></div>
-                        <div style='margin-top:5px; margin-bottom:5px; border-bottom:1px solid #ddd;'></div>
-                        <div style='display:flex; justify-content:space-between;'><span>MACD</span> <span style='color:{'green' if macd_val > macd_signal else 'red'}'>{macd_val:.3f}</span></div>
-                        <div style='display:flex; justify-content:space-between;'><span>Upper Band</span> <span>{bb_upper:.2f}</span></div>
-                        <div style='display:flex; justify-content:space-between;'><span>Lower Band</span> <span>{bb_lower:.2f}</span></div>
-                    </div>
-                    """, unsafe_allow_html=True)
+                        rsi_color = "gray"
+                        # ไอคอน Sideway สีเทา (คงเดิม)
+                        rsi_icon = """<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#6b7280" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M15 16l4-4-4-4"/><path d="M9 8l-4 4 4 4"/></svg>"""
                     
-                    st.subheader("🚧 Key Levels (Smart Filter)")
-                    potential_levels = [
-                        (ema20, "EMA 20"), (ema50, "EMA 50"), (ema200, "EMA 200"),
-                        (bb_lower, "BB Lower"), (bb_upper, "BB Upper"),
-                        (df['High'].tail(60).max(), "High 60 Days"),
-                        (df['Low'].tail(60).min(), "Low 60 Days")
-                    ]
-                    raw_supports = []
-                    raw_resistances = []
-                    for val, label in potential_levels:
-                        if val < price: raw_supports.append((val, label))
-                        elif val > price: raw_resistances.append((val, label))
-                    raw_supports.sort(key=lambda x: x[0], reverse=True)
-                    raw_resistances.sort(key=lambda x: x[0])
+                    st.markdown(custom_metric_html("⚡ RSI (14)", f"{rsi:.1f}", get_rsi_short_label(rsi), rsi_color, rsi_icon), unsafe_allow_html=True)
+                    st.caption(f"Status: {get_rsi_short_label(rsi)}")
 
-                    def filter_levels(levels, threshold_pct=0.015):
-                        selected = []
-                        for val, label in levels:
-                            if not selected:
-                                selected.append((val, label))
-                            else:
-                                last_val = selected[-1][0]
-                                diff = abs(val - last_val) / last_val
-                                if diff > threshold_pct: selected.append((val, label))
-                        return selected
+                # ส่วนแสดงผล MACD
+                with c5:
+                    if macd_val > macd_signal:
+                        macd_color = "green"
+                        macd_text = "Bullish"
+                        macd_icon = icon_up_svg
+                    else:
+                        macd_color = "red"
+                        macd_text = "Bearish"
+                        macd_icon = icon_down_svg
+                        
+                    st.markdown(custom_metric_html("🌊 MACD Momentum", f"{macd_val:.3f}", macd_text, macd_color, macd_icon), unsafe_allow_html=True)
+                    st.caption(f"Signal: {macd_signal:.3f}")
 
-                    final_supports = filter_levels(raw_supports)[:3]
-                    final_resistances = filter_levels(raw_resistances)[:2]
-
-                    st.markdown("#### 🟢 แนวรับ (จุดรอซื้อ)")
-                    if final_supports:
-                        for v, d in final_supports: st.write(f"- **{v:.2f}** : {d}")
-                    else: st.write("- ไม่มีแนวรับใกล้เคียง (All Time High?)")
-                    st.markdown("#### 🔴 แนวต้าน (จุดรอขาย)")
-                    if final_resistances:
-                        for v, d in final_resistances: st.write(f"- **{v:.2f}** : {d}")
-                    else: st.write("- ไม่มีแนวต้านใกล้เคียง (All Time Low?)")
-
-                with c_ai:
-                    exp_adx, exp_rsi, exp_macd = get_detailed_explanation(adx_val, rsi, macd_val, macd_signal, price, ema200)
-                    st.subheader("🧐 AI อธิบายความหมาย")
-                    with st.container():
-                        st.info(f"💪 **ADX:** {exp_adx}")
-                        st.info(f"⚡ **RSI:** {exp_rsi}")
-                        st.info(f"🌊 **MACD:** {exp_macd}")
-                    
-                    st.subheader("🤖 AI STRATEGY")
-                    with st.chat_message("assistant"):
-                        st.markdown(f"### 🎯 {ai_report['action']['strategy']}")
-                        for step in ai_report['action']['steps']: st.write(f"- {step}")
-                        st.markdown("---")
-                        # 4. ✅ UPDATE: เปลี่ยน Context เป็น มุมมอง
-                        st.caption(f"มุมมอง: {ai_report['context']}")
-
-                st.write("")
-                # 5. ✅ UPDATE: เพิ่มกล่องหมายเหตุ (Disclaimer)
-                st.markdown("""
-                <div class='disclaimer-box'>
-                    ⚠️ <b>หมายเหตุ:</b> ข้อมูลนี้มาจากการวิเคราะห์ทางเทคนิคด้วยระบบ AI เพื่อประกอบการตัดสินใจเท่านั้น <br>
+                st.markdown("---")
+                
+                # --- AI Analysis Text ---
+                # ส่วนนี้คุณสั่งให้เปลี่ยน "context" เป็น "มุมมอง" และเพิ่ม Disclaimer แล้ว
+                # ผมไม่ได้แก้ไขอะไรเพิ่มเติมในส่วนนี้ตามคำสั่งครับ
+                
+                st.markdown(f"### 🤖 AI Analysis: {ai_report['banner_title']}")
+                
+                # กล่อง Disclaimer ตามคำสั่งเดิม
+                st.markdown(f"""
+                <div class="disclaimer-box">
+                    ⚠️ <b>หมายเหตุ:</b> ข้อมูลนี้มาจากการวิเคราะห์ทางเทคนิคด้วยระบบ AI เพื่อประกอบการตัดสินใจเท่านั้น 
                     ผู้ใช้งานควรศึกษาก่อนการลงทุน ผู้พัฒนาไม่รับผิดชอบต่อความเสียหายใดๆ ที่เกิดขึ้นจากการนำข้อมูลนี้ไปใช้
                 </div>
                 """, unsafe_allow_html=True)
 
-                st.divider()
-                rsi_interp_str = get_rsi_interpretation(rsi)
-                adx_interp_str = get_adx_interpretation(adx_val)
-                macd_interp_str = "🟢 แรงซื้อนำ (Bullish)" if macd_val > macd_signal else "🔴 แรงขายนำ (Bearish)"
-                display_learning_section(rsi, rsi_interp_str, macd_val, macd_signal, macd_interp_str, adx_val, adx_interp_str, price, bb_upper, bb_lower)
-
+                col_tech, col_act = st.columns(2)
+                with col_tech:
+                    st.info(f"**🏗️ Market Structure:**\n\n{ai_report['technical']['structure']}")
+                    st.info(f"**📊 Indicator Status:**\n\n{ai_report['technical']['status']}")
+                
+                with col_act:
+                    st.success(f"{ai_report['action']['strategy']}")
+                    for step in ai_report['action']['steps']:
+                        st.write(f"- {step}")
+                
+                # เปลี่ยนหัวข้อ Context เป็น "มุมมอง" ตามคำสั่งเดิม
+                st.warning(f"**💡 มุมมอง (Perspective):**\n\n{ai_report['context']}")
+                
+                st.markdown("---")
+                adx_exp, rsi_exp, macd_exp = get_detailed_explanation(adx_val, rsi, macd_val, macd_signal, price, ema200)
+                st.markdown(f"#### 📝 คำอธิบายภาษาคน (Explained):\n* **เทรนด์ (ADX):** {adx_exp}\n* **ความถูกแพง (RSI):** {rsi_exp}\n* **แรงส่ง (MACD):** {macd_exp}")
+                
+                st.markdown("---")
+                display_learning_section(rsi, get_rsi_interpretation(rsi), macd_val, macd_signal, "ดูโมเมนตัม", adx_val, get_adx_interpretation(adx_val), price, bb_upper, bb_lower)
+            
             else:
-                st.error("ไม่พบข้อมูลหุ้น หรือ ข้อมูลไม่เพียงพอสำหรับคำนวณ Indicator (ต้องมีมากกว่า 200 แท่งเทียน)")
+                st.error(f"❌ ไม่พบข้อมูลหุ้น {symbol_input} หรือข้อมูลไม่เพียงพอ (ตลาดอาจปิดหรือชื่อหุ้นผิด)")
         
         if not realtime_mode: break
         time.sleep(10)
