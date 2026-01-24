@@ -353,10 +353,10 @@ if submit_btn:
                         color = "#16a34a" if change >= 0 else "#dc2626"
                         bg = "#e8f5ec" if change >= 0 else "#fee2e2"
                         arrow = "▲" if change >= 0 else "▼"
-                        # UPDATE: font-size 11px
-                        return f'<span style="background:{bg}; color:{color}; padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 600; margin-left: 8px;">{arrow} {change:+.2f} ({percent:.2f}%)</span>'
+                        # UPDATE: font-size 12px
+                        return f'<span style="background:{bg}; color:{color}; padding: 2px 8px; border-radius: 10px; font-size: 12px; font-weight: 600; margin-left: 8px;">{arrow} {change:+.2f} ({percent:.2f}%)</span>'
 
-                    # 1. สร้าง HTML ส่วน OHLC (UPDATE: font-size 11px)
+                    # 1. สร้าง HTML ส่วน OHLC (UPDATE: font-size 12px, margin-top -5px เพื่อขยับขึ้น)
                     ohlc_html = ""
                     m_state = info.get('marketState', '').upper()
                     if m_state != "REGULAR": 
@@ -371,7 +371,7 @@ if submit_btn:
                             val_color = "#16a34a" if day_chg >= 0 else "#dc2626"
                             
                             ohlc_html = f"""
-                            <div style="font-size: 11px; font-weight: 600; margin-bottom: 5px; font-family: 'Source Sans Pro', sans-serif; white-space: nowrap; overflow-x: auto;">
+                            <div style="font-size: 12px; font-weight: 600; margin-bottom: 5px; font-family: 'Source Sans Pro', sans-serif; white-space: nowrap; overflow-x: auto;">
                                 <span style="margin-right: 5px; opacity: 0.7;">O</span><span style="color: {val_color}; margin-right: 12px;">{d_open:.2f}</span>
                                 <span style="margin-right: 5px; opacity: 0.7;">H</span><span style="color: {val_color}; margin-right: 12px;">{d_high:.2f}</span>
                                 <span style="margin-right: 5px; opacity: 0.7;">L</span><span style="color: {val_color}; margin-right: 12px;">{d_low:.2f}</span>
@@ -388,8 +388,8 @@ if submit_btn:
                         c = info['preMarketChange']
                         prev_p = p - c
                         pct = (c / prev_p) * 100 if prev_p != 0 else 0
-                        # UPDATE: font-size 11px
-                        pre_post_html += f'<div style="margin-bottom: 6px; font-size: 11px;">☀️ Pre: <b>{p:.2f}</b> {make_pill(c, pct)}</div>'
+                        # UPDATE: font-size 12px
+                        pre_post_html += f'<div style="margin-bottom: 6px; font-size: 12px;">☀️ Pre: <b>{p:.2f}</b> {make_pill(c, pct)}</div>'
 
                     # Post Market
                     if info.get('postMarketPrice') and info.get('postMarketChange'):
@@ -397,12 +397,12 @@ if submit_btn:
                          c = info['postMarketChange']
                          prev_p = p - c
                          pct = (c / prev_p) * 100 if prev_p != 0 else 0
-                         # UPDATE: font-size 11px
-                         pre_post_html += f'<div style="margin-bottom: 6px; font-size: 11px;">🌙 Post: <b>{p:.2f}</b> {make_pill(c, pct)}</div>'
+                         # UPDATE: font-size 12px
+                         pre_post_html += f'<div style="margin-bottom: 6px; font-size: 12px;">🌙 Post: <b>{p:.2f}</b> {make_pill(c, pct)}</div>'
 
-                    # แสดงผล
+                    # แสดงผล (UPDATE: margin-top: -5px เพื่อขยับขึ้น, margin-bottom: 15px เพื่อเว้นห่างกรอบเทรนด์)
                     if ohlc_html or pre_post_html:
-                        st.markdown(f'<div style="margin-top: 10px;">{ohlc_html}{pre_post_html}</div>', unsafe_allow_html=True)
+                        st.markdown(f'<div style="margin-top: -5px; margin-bottom: 15px;">{ohlc_html}{pre_post_html}</div>', unsafe_allow_html=True)
                     # -----------------------------------------------------------
 
                 if tf_code == "1h": tf_label = "TF Hour"
