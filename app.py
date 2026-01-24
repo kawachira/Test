@@ -346,53 +346,58 @@ if submit_btn:
                     </div>
                     """, unsafe_allow_html=True)
                     
-                    # --- UPDATE NEW: Pre/Post Market + OHLC (Flexbox Layout) ---
-                    extra_info_html = ""
-
-                    # Helper function สร้าง Pill สีเขียว/แดง
+                    # --- UPDATE NEW: Layout OHLC + Pre/Post ---
+                    # Helper function สร้าง Pill สีเขียว/แดง (สำหรับ Pre/Post)
                     def make_pill(change, percent):
                         color = "#16a34a" if change >= 0 else "#dc2626"
                         bg = "#e8f5ec" if change >= 0 else "#fee2e2"
                         arrow = "▲" if change >= 0 else "▼"
-                        # คำนวณ % ใหม่ถ้าของเดิมไม่มี
-                        return f'<span style="background:{bg}; color:{color}; padding: 2px 8px; border-radius: 8px; font-size: 14px; font-weight: 500;">{arrow} {change:+.2f} ({percent:.2f}%)</span>'
+                        return f'<span style="background:{bg}; color:{color}; padding: 4px 10px; border-radius: 12px; font-size: 16px; font-weight: 600; margin-left: 8px;">{arrow} {change:+.2f} ({percent:.2f}%)</span>'
 
-                    # 1. Pre Market Logic
+                    # 1. สร้าง HTML ส่วน OHLC ก่อน (ให้สีเป็นสีปกติของ Theme ไม่ fix สีเขียว/แดง)
+                    ohlc_html = ""
+                    m_state = info.get('marketState', '').upper()
+                    if m_state != "REGULAR": 
+                        d_open = info.get('regularMarketOpen')
+                        d_high = info.get('dayHigh')
+                        d_low = info.get('dayLow')
+                        d_close = info.get('regularMarketPrice')
+                        
+                        if d_open and d_high and d_low and d_close:
+                            # ใช้ฟอนต์หนา และไม่ใส่สี (inherit ตาม Theme)
+                            ohlc_html = f"""
+                            <div style="font-size: 18px; font-weight: 600; margin-bottom: 8px; font-family: 'Source Sans Pro', sans-serif;">
+                                <span style="margin-right: 12px;">O {d_open:.2f}</span>
+                                <span style="margin-right: 12px;">H {d_high:.2f}</span>
+                                <span style="margin-right: 12px;">L {d_low:.2f}</span>
+                                <span>C {d_close:.2f}</span>
+                            </div>
+                            """
+
+                    # 2. สร้าง HTML ส่วน Pre/Post Market (คำนวณ % ใหม่เอง)
+                    pre_post_html = ""
+                    
+                    # Pre Market
                     if info.get('preMarketPrice') and info.get('preMarketChange'):
                         p = info['preMarketPrice']
                         c = info['preMarketChange']
-                        pct = info.get('preMarketChangePercent', 0) * 100
-                        # ถ้า yfinance ไม่ส่ง % มา ให้คำนวณเอง
-                        if pct == 0 and (p - c) != 0: pct = (c / (p - c)) * 100
-                        
-                        extra_info_html += f'<div style="margin-right: 15px;">☀️ Pre: <b>{p:.2f}</b> {make_pill(c, pct)}</div>'
+                        # คำนวณ % ใหม่: (Change / (Current - Change)) * 100
+                        prev_p = p - c
+                        pct = (c / prev_p) * 100 if prev_p != 0 else 0
+                        pre_post_html += f'<div style="margin-bottom: 6px; font-size: 16px;">☀️ Pre: <b>{p:.2f}</b> {make_pill(c, pct)}</div>'
 
-                    # 2. Post Market Logic
+                    # Post Market
                     if info.get('postMarketPrice') and info.get('postMarketChange'):
                          p = info['postMarketPrice']
                          c = info['postMarketChange']
-                         pct = info.get('postMarketChangePercent', 0) * 100
-                         if pct == 0 and (p - c) != 0: pct = (c / (p - c)) * 100
+                         # คำนวณ % ใหม่
+                         prev_p = p - c
+                         pct = (c / prev_p) * 100 if prev_p != 0 else 0
+                         pre_post_html += f'<div style="margin-bottom: 6px; font-size: 16px;">🌙 Post: <b>{p:.2f}</b> {make_pill(c, pct)}</div>'
 
-                         extra_info_html += f'<div style="margin-right: 15px;">🌙 Post: <b>{p:.2f}</b> {make_pill(c, pct)}</div>'
-                    
-                    # 3. OHLC Logic (แสดงเฉพาะตลาดปิด และใช้ Flexbox ให้ต่อท้าย)
-                    m_state = info.get('marketState', '').upper()
-                    if m_state != "REGULAR":
-                         d_open = info.get('regularMarketOpen')
-                         d_high = info.get('dayHigh')
-                         d_low = info.get('dayLow')
-                         d_close = info.get('regularMarketPrice')
-                         
-                         if d_open and d_high and d_low and d_close:
-                             day_chg = info.get('regularMarketChange', 0)
-                             # สีตัวอักษรตามสถานะวันนั้น
-                             c_text = "#16a34a" if day_chg >= 0 else "#dc2626"
-                             ohlc_html = f'<span style="color:{c_text}; font-weight:600; white-space: nowrap;">O: {d_open:.2f} H: {d_high:.2f} L: {d_low:.2f} C: {d_close:.2f}</span>'
-                             extra_info_html += f'<div>{ohlc_html}</div>'
-
-                    # แสดงผลรวมกันในบรรทัดเดียว (ถ้าพอ) ด้วย Flexbox
-                    st.markdown(f'<div style="display:flex; flex-wrap:wrap; align-items:center; margin-top:5px; font-size:16px; font-family: \'Source Sans Pro\', sans-serif;">{extra_info_html}</div>', unsafe_allow_html=True)
+                    # แสดงผล: OHLC ขึ้นก่อน แล้วตามด้วย Pre/Post
+                    if ohlc_html or pre_post_html:
+                        st.markdown(f'<div style="margin-top: 10px;">{ohlc_html}{pre_post_html}</div>', unsafe_allow_html=True)
                     # -----------------------------------------------------------
 
                 if tf_code == "1h": tf_label = "TF Hour"
