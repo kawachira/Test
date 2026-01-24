@@ -164,6 +164,10 @@ def get_data(symbol, interval):
         
         stock_info = {
             'longName': ticker.info.get('longName', symbol),
+            'marketState': ticker.info.get('marketState', 'UNKNOWN'), # เอาไว้เช็คตลาดปิด
+            'dayHigh': ticker.info.get('dayHigh'),
+            'dayLow': ticker.info.get('dayLow'),
+            'regularMarketOpen': ticker.info.get('regularMarketOpen'),
             'trailingPE': ticker.info.get('trailingPE', 'N/A'),
             'regularMarketPrice': ticker.info.get('regularMarketPrice'),
             'regularMarketChange': ticker.info.get('regularMarketChange'),
@@ -346,6 +350,30 @@ if submit_btn:
                     post_p, post_c = info.get('postMarketPrice'), info.get('postMarketChange')
                     if pre_p and pre_c: st.caption(f"☀️ Pre: {pre_p} ({pre_c:+.2f})")
                     if post_p and post_c: st.caption(f"🌙 Post: {post_p} ({post_c:+.2f})")
+                    
+                    # --- UPDATE: OHLC Data (Show only when market is closed) ---
+                    m_state = info.get('marketState', '').upper()
+                    # แสดงเฉพาะเมื่อตลาดปิด (ไม่ใช่ REGULAR)
+                    if m_state != "REGULAR": 
+                        d_open = info.get('regularMarketOpen')
+                        d_high = info.get('dayHigh')
+                        d_low = info.get('dayLow')
+                        d_close = info.get('regularMarketPrice')
+                        
+                        if d_open and d_high and d_low and d_close:
+                            # เช็คว่าหุ้นบวกหรือลบ (เทียบจาก Change ของวัน)
+                            day_change = info.get('regularMarketChange', 0)
+                            ohlc_color = "#16a34a" if day_change >= 0 else "#dc2626"
+                            
+                            st.markdown(f"""
+                            <div style="color: {ohlc_color}; font-size: 16px; font-weight: 500; margin-top: 4px; font-family: 'Source Sans Pro', sans-serif;">
+                                <span style="margin-right: 8px;">O {d_open:.2f}</span>
+                                <span style="margin-right: 8px;">H {d_high:.2f}</span>
+                                <span style="margin-right: 8px;">L {d_low:.2f}</span>
+                                <span>C {d_close:.2f}</span>
+                            </div>
+                            """, unsafe_allow_html=True)
+                    # -----------------------------------------------------------
 
                 if tf_code == "1h": tf_label = "TF Hour"
                 elif tf_code == "1wk": tf_label = "TF Week"
