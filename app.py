@@ -8,7 +8,7 @@ import time
 # --- 1. ตั้งค่าหน้าเว็บ ---
 st.set_page_config(page_title="AI Stock Master", page_icon="💎", layout="wide")
 
-# --- 2. CSS ปรับแต่ง (คงเดิมตามที่สั่ง: ล๊อคหน้าจอ / ขยับช่องค้นหา / จัด Layout) ---
+# --- 2. CSS ปรับแต่ง (UPDATE: ขยับ Layout ตามที่ขอ) ---
 st.markdown("""
     <style>
     /* ล๊อคการเลื่อนหน้าจอในตอนเริ่มต้น */
@@ -16,11 +16,14 @@ st.markdown("""
         overflow: hidden;
     }
 
-    /* Padding ด้านล่างเยอะๆ เพื่อไม่ให้ปุ่ม Manage app บังเนื้อหา */
-    .block-container { padding-top: 0.5rem !important; padding-bottom: 8rem !important; }
+    /* UPDATE: 
+       1. padding-top: 3rem (เพิ่มจาก 0.5rem) -> ดันเนื้อหาทั้งหมดลงมา ไม่ให้ชื่อติดขอบบน
+       2. padding-bottom: 8rem -> เว้นที่ข้างล่างให้ปุ่ม Manage app
+    */
+    .block-container { padding-top: 3rem !important; padding-bottom: 8rem !important; }
 
-    /* ลด margin หัวข้อ */
-    h1 { text-align: center; font-size: 2.8rem !important; margin-bottom: 5px; }
+    /* UPDATE: margin-bottom: 10px -> จัดระยะห่างหัวข้อกับกล่องค้นหาให้ใกล้กันพอดีๆ */
+    h1 { text-align: center; font-size: 2.8rem !important; margin-bottom: 10px !important; margin-top: 0px !important; }
     
     /* กล่อง Form */
     div[data-testid="stForm"] {
@@ -35,16 +38,16 @@ st.markdown("""
         width: 100%; border-radius: 12px; font-size: 1.2rem; font-weight: bold; padding: 15px 0;
     }
     
-    /* UPDATE: ดีไซน์กล่องหมายเหตุให้เด่น */
+    /* ดีไซน์กล่องหมายเหตุ */
     .disclaimer-box {
         margin-top: 20px;
         margin-bottom: 20px;
         padding: 20px;
-        background-color: #fff8e1; /* สีพื้นหลังเหลืองอ่อนนวลๆ */
-        border: 2px solid #ffc107; /* ขอบสีเหลืองเข้ม */
+        background-color: #fff8e1;
+        border: 2px solid #ffc107;
         border-radius: 12px;
         font-size: 1rem;
-        color: #5d4037; /* สีตัวอักษรน้ำตาลเข้มเพื่อให้อ่านง่าย */
+        color: #5d4037;
         text-align: center;
         font-weight: 500;
         box-shadow: 0 4px 6px rgba(0,0,0,0.05);
@@ -54,7 +57,7 @@ st.markdown("""
 
 # --- 3. ส่วนหัวข้อ ---
 st.markdown("<h1>💎 Ai<br><span style='font-size: 1.5rem; opacity: 0.7;'>ระบบวิเคราะห์หุ้นอัจฉริยะ</span></h1>", unsafe_allow_html=True)
-st.write("")
+# ลบ st.write("") ออก เพื่อให้กล่องค้นหาขยับขึ้นไปใกล้ชื่อแอพมากขึ้น
 
 # --- Form ค้นหา ---
 col_space1, col_form, col_space2 = st.columns([1, 2, 1])
