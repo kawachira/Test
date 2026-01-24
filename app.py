@@ -125,14 +125,15 @@ def get_detailed_explanation(adx, rsi, macd_val, macd_signal, price, ema200):
 
     return adx_explain, rsi_explain, macd_explain
 
-def display_learning_section(rsi, macd_val, macd_signal, adx_val, price, bb_upper, bb_lower):
+# --- UPDATE: เพิ่มพารามิเตอร์สำหรับคำแปลใน Learning Section (คงเดิม) ---
+def display_learning_section(rsi, rsi_interp, macd_val, macd_signal, macd_interp, adx_val, adx_interp, price, bb_upper, bb_lower):
     st.markdown("### 📘 มุมความรู้: ค่าต่างๆ คืออะไร? มาจากไหน?")
     with st.expander("คลิกเพื่อเรียนรู้ความหมายของอินดิเคเตอร์แต่ละตัว", expanded=False):
-        st.markdown(f"#### 1. MACD (Moving Average Convergence Divergence)\n* **ค่าปัจจุบัน:** `{macd_val:.3f}`\n* **คืออะไร?:** เครื่องมือดู 'โมเมนตัม' หรือแรงส่งของราคา\n* **มาจากไหน?:** เกิดจากการเอาเส้นค่าเฉลี่ย 2 เส้นมาลบกัน คือ **EMA(12) - EMA(26)**")
+        st.markdown(f"#### 1. MACD (Moving Average Convergence Divergence)\n* **ค่าปัจจุบัน:** `{macd_val:.3f}` -> {macd_interp}\n* **คืออะไร?:** เครื่องมือดู 'โมเมนตัม' หรือแรงส่งของราคา\n* **มาจากไหน?:** เกิดจากการเอาเส้นค่าเฉลี่ย 2 เส้นมาลบกัน คือ **EMA(12) - EMA(26)**")
         st.divider()
-        st.markdown(f"#### 2. RSI (Relative Strength Index)\n* **ค่าปัจจุบัน:** `{rsi:.2f}`\n* **คืออะไร?:** ดัชนีวัดการ 'ซื้อมากเกินไป' หรือ 'ขายมากเกินไป'\n* **มาจากไหน?:** คำนวณจากสัดส่วนของวันที่หุ้นขึ้นเทียบกับวันที่หุ้นลงในรอบ 14 วัน")
+        st.markdown(f"#### 2. RSI (Relative Strength Index)\n* **ค่าปัจจุบัน:** `{rsi:.2f}` -> {rsi_interp}\n* **คืออะไร?:** ดัชนีวัดการ 'ซื้อมากเกินไป' หรือ 'ขายมากเกินไป'\n* **มาจากไหน?:** คำนวณจากสัดส่วนของวันที่หุ้นขึ้นเทียบกับวันที่หุ้นลงในรอบ 14 วัน")
         st.divider()
-        st.markdown(f"#### 3. ADX (Average Directional Index)\n* **ค่าปัจจุบัน:** `{adx_val:.2f}`\n* **คืออะไร?:** เครื่องมือวัด 'ความรุนแรงของเทรนด์' (ไม่บอกทิศทาง บอกแค่ว่าแรงไหม)")
+        st.markdown(f"#### 3. ADX (Average Directional Index)\n* **ค่าปัจจุบัน:** `{adx_val:.2f}` -> {adx_interp}\n* **คืออะไร?:** เครื่องมือวัด 'ความรุนแรงของเทรนด์' (ไม่บอกทิศทาง บอกแค่ว่าแรงไหม)")
         st.divider()
         st.markdown(f"#### 4. Bollinger Bands (BB)\n* **Upper:** `{bb_upper:.2f}` | **Lower:** `{bb_lower:.2f}`\n* **คืออะไร?:** กรอบการแกว่งตัวของราคาเปรียบเหมือนขอบถนน")
 
@@ -167,7 +168,7 @@ def get_data(symbol, interval):
     except:
         return None, None
 
-# --- 6. AI Logic ---
+# --- 6. AI Logic (คงเดิม) ---
 def analyze_market_structure(price, ema20, ema50, ema200, rsi, macd_val, macd_signal, adx_val, bb_upper, bb_lower):
     report = { "technical": {}, "context": "", "action": {}, "status_color": "", "banner_title": "" }
     
@@ -188,8 +189,9 @@ def analyze_market_structure(price, ema20, ema50, ema200, rsi, macd_val, macd_si
             action_1 = "แบ่งขายทำกำไรบางส่วน (Trim Profit) แล้วรอรับกลับเมื่อย่อ"
         else:
             report["context"] = "โมเมนตัมแข็งแกร่ง รายใหญ่ยังคุมเกม ตลาดยังมีพื้นที่ให้วิ่งต่อ"
+            # --- UPDATE: ระบุราคาเส้นกลาง (EMA 20) ---
             action_1 = "ถือต่อ (Let Profit Run) ใช้ EMA 20 เป็นจุด Trailing Stop"
-        action_2 = f"จุดรับที่ดีคือ EMA 20 ({ema20:.2f}) หรือเส้นกลาง Bollinger"
+        action_2 = f"จุดรับที่ดีคือโซนเส้นกลาง (EMA 20) ที่บริเวณ **{ema20:.2f}**"
         report["action"] = {"strategy": "**กลยุทธ์: Follow Trend (เกาะเทรนด์)**", "steps": [action_1, action_2]}
 
     elif price > ema200 and price < ema20:
@@ -209,7 +211,8 @@ def analyze_market_structure(price, ema20, ema50, ema200, rsi, macd_val, macd_si
                 report["banner_title"] = "Oversold Bounce: ลุ้นเด้งสั้น (Oversold)"
                 report["technical"] = { "structure": "ราคาลงลึกหลุดกรอบล่าง Bollinger / RSI ต่ำมาก", "status": "เข้าเขต Selling Climax (ขายมากเกินไป) มีโอกาสดีดกลับแรงๆ" }
                 report["context"] = "ความเสี่ยงสูง แต่ Reward คุ้มค่าสำหรับคนเล่นสั้น (High Risk High Return)"
-                action_1 = "เก็งกำไรสั้นๆ (Scalp) เป้าขายคือเส้นกลาง Bollinger หรือ EMA 20"
+                # --- UPDATE: ระบุราคาเส้นกลาง (EMA 20) ---
+                action_1 = f"เก็งกำไรสั้นๆ (Scalp) เป้าขายคือโซนเส้นกลาง (EMA 20) แถวๆ **{ema20:.2f}**"
                 action_2 = "วาง Stop Loss ไว้ที่ Low ล่าสุดทันที ห้ามลืม"
             else:
                 report["status_color"] = "red"
@@ -324,47 +327,44 @@ if submit_btn:
                 elif st_color == "red": c2.error(f"📉 {main_status}\n\n**{tf_label}**")
                 else: c2.warning(f"⚖️ {main_status}\n\n**{tf_label}**")
 
-                # --- Metrics Section (ใช้ Custom HTML และ SVG Icon ตามที่ขอ) ---
+                # --- Metrics Section (ใช้ Custom HTML และ SVG Icon) ---
                 c3, c4, c5 = st.columns(3)
                 with c3:
                     st.metric("📊 P/E Ratio", f"{info['trailingPE']:.2f}" if isinstance(info['trailingPE'], (int,float)) else "N/A")
                     st.caption(get_pe_interpretation(info['trailingPE']))
                 
-                # --- นิยามไอคอน SVG ---
-                # ลูกศรชี้ขึ้น (เขียว)
-                icon_up_svg = """<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#16a34a" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5"/><path d="m5 12 7-7 7 7"/></svg>"""
-                # ลูกศรชี้ลง (แดง)
-                icon_down_svg = """<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#dc2626" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14"/><path d="m19 12-7 7-7-7"/></svg>"""
-                # วงกลม (เทา)
+                # --- นิยามไอคอน SVG (คงเดิม) ---
+                icon_up_svg = """<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="#16a34a"><path d="M12 4l-8 8h16z"/></svg>"""
+                icon_down_svg = """<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="#dc2626"><path d="M12 20l8-8H4z"/></svg>"""
                 icon_flat_svg = """<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="#6b7280"><circle cx="12" cy="12" r="10"/></svg>"""
                 
-                # --- ลูกศรคลื่น (เทา) - ใช้แบบที่ถูกต้องตามภาพ ---
-                icon_wave_svg = """<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#6b7280" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M 2 12 C 2 12, 4 16, 8 16 C 12 16, 12 8, 16 8 C 20 8, 22 12, 22 12"/><polyline points="5 9 2 12 5 15"/><polyline points="19 9 22 12 19 15"/></svg>"""
+                # --- แก้ไข: ไอคอน Weak/Sideway เป็นลูกศรสวนทาง (Double Arrow) แบบทึบ ---
+                icon_wave_svg = """<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="#6b7280"><path d="M16,17.01V10h-2v7.01h-3L15,21l4-3.99H16z M9,3L5,6.99h3V14h2V6.99h3L9,3z"/></svg>"""
 
-                # Custom RSI Metric (ใช้ SVG)
+                # Custom RSI Metric (ใช้ SVG - คงเดิม)
                 with c4:
                     rsi_short_lbl = get_rsi_short_label(rsi)
                     if rsi >= 70: 
-                        c_stat = "red"; icon_final = icon_up_svg # Overbought (แดง)
+                        c_stat = "red"; icon_final = icon_up_svg
                     elif rsi >= 55: 
-                        c_stat = "green"; icon_final = icon_up_svg # Bullish (เขียว)
+                        c_stat = "green"; icon_final = icon_up_svg
                     elif rsi >= 45: 
-                        c_stat = "gray"; icon_final = icon_flat_svg # Neutral (เทา)
+                        c_stat = "gray"; icon_final = icon_flat_svg
                     elif rsi >= 30: 
-                        c_stat = "red"; icon_final = icon_down_svg # Bearish (ลงแดง)
+                        c_stat = "red"; icon_final = icon_down_svg
                     else: 
-                        c_stat = "green"; icon_final = icon_down_svg # Oversold (ลงเขียว)
+                        c_stat = "green"; icon_final = icon_down_svg
                     
                     st.markdown(custom_metric_html("⚡ RSI (14)", f"{rsi:.2f}", rsi_short_lbl, c_stat, icon_final), unsafe_allow_html=True)
                     st.caption(get_rsi_interpretation(rsi))
 
-                # Custom ADX Metric (ใช้ SVG คลื่น)
+                # Custom ADX Metric (ใช้ SVG - คงเดิม)
                 with c5:
                     if adx_val > 25:
                         c_stat = "green"; icon_final = icon_up_svg
                         lbl_text = "Strong Trend"
                     else:
-                        c_stat = "gray"; icon_final = icon_wave_svg # <-- ใช้ไอคอนคลื่นที่ถูกต้อง
+                        c_stat = "gray"; icon_final = icon_wave_svg # <-- ใช้ไอคอนใหม่
                         lbl_text = "Weak/Sideway"
                         
                     st.markdown(custom_metric_html("💪 ADX Strength", f"{adx_val:.2f}", lbl_text, c_stat, icon_final), unsafe_allow_html=True)
@@ -447,7 +447,14 @@ if submit_btn:
                         st.caption(f"Context: {ai_report['context']}")
 
                 st.divider()
-                display_learning_section(rsi, macd_val, macd_signal, adx_val, price, bb_upper, bb_lower)
+                
+                # --- UPDATE: เตรียมข้อมูลคำแปลก่อนส่งให้ฟังก์ชันเเสดงผล (คงเดิม) ---
+                rsi_interp_str = get_rsi_interpretation(rsi)
+                adx_interp_str = get_adx_interpretation(adx_val)
+                macd_interp_str = "🟢 แรงซื้อนำ (Bullish)" if macd_val > macd_signal else "🔴 แรงขายนำ (Bearish)"
+
+                # เรียกใช้ฟังก์ชันเเสดงผล (คงเดิม)
+                display_learning_section(rsi, rsi_interp_str, macd_val, macd_signal, macd_interp_str, adx_val, adx_interp_str, price, bb_upper, bb_lower)
 
             else:
                 st.error("ไม่พบข้อมูลหุ้น หรือ ข้อมูลไม่เพียงพอสำหรับคำนวณ Indicator (ต้องมีมากกว่า 200 แท่งเทียน)")
