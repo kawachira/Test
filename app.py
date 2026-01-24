@@ -49,26 +49,34 @@ with col_form:
         realtime_mode = st.checkbox("🔴 เปิดโหมด Real-time (ราคาขยับเองทุก 10 วิ)", value=False)
         submit_btn = st.form_submit_button("🚀 วิเคราะห์ทันที / รีเฟรชข้อมูล")
 
-# --- 4. Helper Functions ---
+# --- 4. Helper Functions (เพิ่มคำอธิบาย ADX และคงของเดิมไว้) ---
 def arrow_html(change):
     if change is None: return ""
     return "<span style='color:#16a34a;font-weight:600'>▲</span>" if change > 0 else "<span style='color:#dc2626;font-weight:600'>▼</span>"
 
+# ฟังก์ชันเดิม (ห้ามลบ)
 def get_rsi_interpretation(rsi):
-    if rsi >= 80: return "🔴 Extreme Overbought"
-    elif rsi >= 70: return "🟠 Overbought"
-    elif rsi >= 55: return "🟢 Bullish Zone"
-    elif rsi >= 45: return "⚪ Neutral"
-    elif rsi >= 30: return "🟠 Bearish Zone"
-    elif rsi > 20: return "🟢 Oversold"
-    else: return "🟢 Extreme Oversold"
+    if rsi >= 80: return "🔴 **Extreme Overbought (80+):** แรงซื้อบ้าคลั่ง ระวังการเทขายรุนแรง"
+    elif rsi >= 70: return "🟠 **Overbought (70-80):** ราคาเริ่มตึงตัว อาจมีการเทขายพักฐานเร็วๆ นี้"
+    elif rsi >= 55: return "🟢 **Bullish Zone (55-70):** โมเมนตัมกระทิงครองตลาด ราคาแข็งแกร่ง"
+    elif rsi >= 45: return "⚪ **Sideway/Neutral (45-55):** แรงซื้อขายก้ำกึ่ง รอเลือกทางที่ชัดเจน"
+    elif rsi >= 30: return "🟠 **Bearish Zone (30-45):** โมเมนตัมหมีครองตลาด ระวังราคาไหลลงต่อ"
+    elif rsi > 20: return "🟢 **Oversold (20-30):** ขายมากเกินไป เริ่มเข้าเขต 'ของถูก' ลุ้นเด้งรีบาวด์"
+    else: return "🟢 **Extreme Oversold (<20):** ลงลึกมาก Panic Sell จบแล้ว"
 
+# ฟังก์ชันเดิม (ห้ามลบ)
 def get_pe_interpretation(pe):
-    if isinstance(pe, str) and pe == 'N/A': return "⚪ N/A"
-    if pe < 0: return "🔴 ขาดทุน"
+    if isinstance(pe, str) and pe == 'N/A': return "⚪ N/A (บริษัทอาจขาดทุน/ไม่มีกำไร)"
+    if pe < 0: return "🔴 ขาดทุน (Earnings ติดลบ)"
     if pe < 15: return "🟢 หุ้นถูก (Value)"
     if pe < 30: return "🟡 ราคาเหมาะสม"
     return "🟠 หุ้นแพง (Growth)"
+
+# --- เพิ่มฟังก์ชันอธิบาย ADX ---
+def get_adx_interpretation(adx):
+    if adx >= 50: return "🚀 **Super Strong Trend:** เทรนด์แรงมาก (ระวังจุดพีค)"
+    if adx >= 25: return "💪 **Strong Trend:** มีเทรนด์ชัดเจน (น่าติดตาม)"
+    return "💤 **Weak Trend/Sideway:** ตลาดไร้ทิศทาง (แกว่งตัว)"
 
 # --- 5. Get Data ---
 @st.cache_data(ttl=10, show_spinner=False)
@@ -120,19 +128,19 @@ def analyze_market_structure(price, ema20, ema50, ema200, rsi, macd_val, macd_si
     else: trend_strength = "Trend อ่อนแอ / ไซด์เวย์ (Weak/Sideway)"
 
     # --- เช็ค Momentum ด้วย MACD ---
-    macd_status = "Bullish" if macd_val > macd_signal else "Bearish"
+    macd_status = "Bullish (ตัดขึ้น)" if macd_val > macd_signal else "Bearish (ตัดลง)"
 
     # --- Scenario 1: ขาขึ้นแข็งแกร่ง ---
     if price > ema200 and price > ema50 and price > ema20:
         report["status_color"] = "green"
-        if adx_val > 25 and macd_status == "Bullish":
+        if adx_val > 25 and macd_val > macd_signal:
              report["banner_title"] = "🚀 Super Bullish: ขาขึ้นสมบูรณ์แบบ"
         else:
              report["banner_title"] = "Bullish: ขาขึ้น (แต่เริ่มตึงตัว)"
 
         report["technical"] = {
             "structure": f"ราคายืนเหนือทุกเส้น EMA + {trend_strength}",
-            "status": f"MACD ตัดขึ้น ({macd_status}) สนับสนุนทิศทางขาขึ้น"
+            "status": f"MACD: {macd_val:.3f} ({macd_status}) สนับสนุนทิศทางขาขึ้น"
         }
         
         if price > bb_upper:
@@ -215,7 +223,7 @@ def analyze_market_structure(price, ema20, ema50, ema200, rsi, macd_val, macd_si
 
     return report
 
-# --- 7. Display (Main Loop - FIX APPLIED HERE) ---
+# --- 7. Display (Main Loop) ---
 if submit_btn:
     st.divider()
     result_placeholder = st.empty()
@@ -238,20 +246,14 @@ if submit_btn:
                 macd = ta.macd(df['Close'])
                 df = pd.concat([df, macd], axis=1)
                 
-                # 3. Bollinger Bands (*** FIX: แก้ไขตรงนี้เพื่อกัน Error ***)
-                # คำนวณแล้วเก็บใส่ตัวแปร bbands ก่อน เพื่อดึงชื่อคอลัมน์ที่ถูกต้อง
+                # 3. Bollinger Bands (Auto Column Name Fix)
                 bbands = ta.bbands(df['Close'], length=20, std=2)
-                
-                # อ่านชื่อคอลัมน์จากผลลัพธ์จริงๆ (ไม่ต้องเดาชื่อ .0)
-                # ปกติ pandas_ta เรียง: Lower(0), Mid(1), Upper(2), Bandwidth(3), Percent(4)
                 if bbands is not None and len(bbands.columns) >= 3:
-                    bbl_col_name = bbands.columns[0]  # ชื่อคอลัมน์ Lower Band
-                    bbu_col_name = bbands.columns[2]  # ชื่อคอลัมน์ Upper Band
+                    bbl_col_name = bbands.columns[0]
+                    bbu_col_name = bbands.columns[2]
                     df = pd.concat([df, bbands], axis=1)
                 else:
-                    # กันเหนียวเผื่อคำนวณไม่ได้
-                    bbl_col_name = None
-                    bbu_col_name = None
+                    bbl_col_name, bbu_col_name = None, None
 
                 # 4. ADX
                 adx = ta.adx(df['High'], df['Low'], df['Close'], length=14)
@@ -261,42 +263,36 @@ if submit_btn:
                 last = df.iloc[-1]
                 price = info['regularMarketPrice'] if info['regularMarketPrice'] else last['Close']
                 
-                # ค่าเดิม
+                # Values
                 rsi = last['RSI']
                 ema20=last['EMA20']; ema50=last['EMA50']; ema200=last['EMA200']
                 
-                # ค่าใหม่ (MACD)
-                # ใช้ iloc เพื่อความปลอดภัย หรือใช้ชื่อ default ของ pandas_ta
-                # Default names: MACD_12_26_9, MACDh_12_26_9, MACDs_12_26_9
+                # MACD extraction
                 try:
                     macd_val = last['MACD_12_26_9']
                     macd_signal = last['MACDs_12_26_9']
                 except KeyError:
-                    # Fallback ถ้าชื่อไม่ตรง (โอกาสน้อยมาก)
                     macd_val = 0; macd_signal = 0
 
-                try:
-                    adx_val = last['ADX_14']
-                except KeyError:
-                    adx_val = 0
+                # ADX extraction
+                try: adx_val = last['ADX_14']
+                except KeyError: adx_val = 0
 
-                # ค่าใหม่ (Bollinger - ใช้ชื่อที่ดึงมาตะกี้)
+                # BB extraction
                 if bbu_col_name and bbl_col_name:
                     bb_upper = last[bbu_col_name]
                     bb_lower = last[bbl_col_name]
                 else:
-                    bb_upper = price * 1.05
-                    bb_lower = price * 0.95
+                    bb_upper = price * 1.05; bb_lower = price * 0.95
                 
-                # ส่งเข้า AI Logic
+                # AI Logic
                 ai_report = analyze_market_structure(price, ema20, ema50, ema200, rsi, macd_val, macd_signal, adx_val, bb_upper, bb_lower)
 
-                # --- DISPLAY UI (คงเดิม) ---
+                # --- DISPLAY UI ---
                 
-                # Header
+                # Header & Price (คงเดิม)
                 st.markdown(f"<h2 style='text-align: center; margin-top: -15px; margin-bottom: 25px;'>🏢 {info['longName']} ({symbol_input})</h2>", unsafe_allow_html=True)
                 
-                # Price Section
                 c1, c2 = st.columns(2)
                 with c1:
                     reg_price = info.get('regularMarketPrice')
@@ -322,16 +318,13 @@ if submit_btn:
                     </div>
                     """, unsafe_allow_html=True)
 
+                    # Pre/Post (ย่อให้ดูง่ายขึ้น)
                     pre_p = info.get('preMarketPrice'); pre_c = info.get('preMarketChange'); 
                     post_p = info.get('postMarketPrice'); post_c = info.get('postMarketChange');
-                    extra_html = ""
-                    if pre_p and pre_c is not None:
-                        extra_html += f"<div>☀️ ก่อนเปิด: <b>{pre_p:.2f}</b> <span style='color:{'#16a34a' if pre_c>0 else '#dc2626'}'>{arrow_html(pre_c)} {pre_c:+.2f}</span></div>"
-                    if post_p and post_c is not None:
-                        extra_html += f"<div>🌙 หลังปิด: <b>{post_p:.2f}</b> <span style='color:{'#16a34a' if post_c>0 else '#dc2626'}'>{arrow_html(post_c)} {post_c:+.2f}</span></div>"
-                    if extra_html: st.markdown(f"<div style='font-size:14px; color:#6b7280; display:flex; gap: 15px; flex-wrap: wrap; margin-top: 5px;'>{extra_html}</div>", unsafe_allow_html=True)
+                    if pre_p and pre_c: st.caption(f"☀️ Pre: {pre_p} ({pre_c:+.2f})")
+                    if post_p and post_c: st.caption(f"🌙 Post: {post_p} ({post_c:+.2f})")
 
-                # Banner Status
+                # Banner
                 if tf_code == "1h": tf_label = "TF Hour"
                 elif tf_code == "1wk": tf_label = "TF Week"
                 else: tf_label = "TF Day"
@@ -342,17 +335,19 @@ if submit_btn:
                 elif st_color == "red": c2.error(f"📉 {main_status}\n\n**{tf_label}**")
                 else: c2.warning(f"⚖️ {main_status}\n\n**{tf_label}**")
 
-                # Metrics Row 1
+                # --- Metrics Row (ปรับปรุงใหม่ตาม Feedback) ---
                 c3, c4, c5 = st.columns(3)
                 with c3:
                     st.metric("📊 P/E Ratio", f"{info['trailingPE']:.2f}" if isinstance(info['trailingPE'], (int,float)) else "N/A")
-                    st.caption(get_pe_interpretation(info['trailingPE']))
+                    st.caption(get_pe_interpretation(info['trailingPE'])) # แสดงคำอธิบาย P/E
                 with c4:
                     rsi_lbl = "Overbought" if rsi>=70 else ("Oversold" if rsi<=30 else "Neutral")
                     st.metric("⚡ RSI (14)", f"{rsi:.2f}", rsi_lbl, delta_color="inverse" if rsi>70 else "normal")
+                    st.caption(get_rsi_interpretation(rsi)) # แสดงคำอธิบาย RSI
                 with c5:
-                    adx_lbl = "Strong Trend" if adx_val > 25 else "Weak/Sideway"
+                    adx_lbl = "Strong" if adx_val > 25 else "Weak"
                     st.metric("💪 ADX Strength", f"{adx_val:.2f}", adx_lbl)
+                    st.caption(get_adx_interpretation(adx_val)) # แสดงคำอธิบาย ADX (ใหม่)
 
                 st.write("") 
 
@@ -360,34 +355,60 @@ if submit_btn:
                 c_ema, c_ai = st.columns([1.5, 2])
                 with c_ema:
                     st.subheader("📉 Technical Indicators")
+                    # ตารางแสดงค่า (ปรับให้ดูง่ายขึ้น)
                     st.markdown(f"""
                     <div style='background-color: var(--secondary-background-color); padding: 15px; border-radius: 10px; font-size: 0.95rem;'>
-                        <div style='display:flex; justify-content:space-between; margin-bottom:5px; border-bottom:1px solid #ddd;'><b>Indicator</b> <b>Value</b></div>
-                        <div style='display:flex; justify-content:space-between;'><span>EMA 20</span> <span>{ema20:.2f}</span></div>
-                        <div style='display:flex; justify-content:space-between;'><span>EMA 50</span> <span>{ema50:.2f}</span></div>
-                        <div style='display:flex; justify-content:space-between;'><span>EMA 200</span> <span>{ema200:.2f}</span></div>
-                        <div style='display:flex; justify-content:space-between; color: #888;'><span>---</span><span>---</span></div>
+                        <div style='display:flex; justify-content:space-between; margin-bottom:5px; border-bottom:1px solid #ddd; font-weight:bold;'><span>Indicator</span> <span>Value</span></div>
+                        <div style='display:flex; justify-content:space-between;'><span>EMA 20 (สั้น)</span> <span>{ema20:.2f}</span></div>
+                        <div style='display:flex; justify-content:space-between;'><span>EMA 50 (กลาง)</span> <span>{ema50:.2f}</span></div>
+                        <div style='display:flex; justify-content:space-between;'><span>EMA 200 (ยาว)</span> <span>{ema200:.2f}</span></div>
+                        <div style='margin-top:5px; margin-bottom:5px; border-bottom:1px solid #ddd;'></div>
                         <div style='display:flex; justify-content:space-between;'><span>MACD</span> <span style='color:{'green' if macd_val > macd_signal else 'red'}'>{macd_val:.3f}</span></div>
                         <div style='display:flex; justify-content:space-between;'><span>Upper Band</span> <span>{bb_upper:.2f}</span></div>
                         <div style='display:flex; justify-content:space-between;'><span>Lower Band</span> <span>{bb_lower:.2f}</span></div>
                     </div>
                     """, unsafe_allow_html=True)
                     
-                    st.subheader("🚧 Key Levels (S/R)")
-                    supports, resistances = [] , []
+                    st.subheader("🚧 Key Levels (เรียงลำดับ)")
                     
-                    if price > ema200: supports.extend([(ema20, "EMA 20"), (bb_lower, "BB Lower")])
-                    else: resistances.extend([(ema200, "EMA 200"), (bb_upper, "BB Upper")])
+                    # 1. รวบรวมแนวรับ/ต้านทั้งหมด
+                    # Logic: 
+                    # แนวรับ = ค่าที่ น้อยกว่า ราคาปัจจุบัน
+                    # แนวต้าน = ค่าที่ มากกว่า ราคาปัจจุบัน
+                    # แหล่งที่มา: EMA, Bollinger Bands, Price High/Low
                     
-                    res_val = df['High'].tail(60).max(); resistances.append((res_val, "High 60 Days"))
-                    sup_val = df['Low'].tail(60).min(); supports.append((sup_val, "Low 60 Days"))
+                    potential_levels = [
+                        (ema20, "EMA 20"), (ema50, "EMA 50"), (ema200, "EMA 200"),
+                        (bb_lower, "BB Lower"), (bb_upper, "BB Upper"),
+                        (df['High'].tail(60).max(), "High 60 Days"),
+                        (df['Low'].tail(60).min(), "Low 60 Days")
+                    ]
+                    
+                    supports = []
+                    resistances = []
+                    
+                    for val, label in potential_levels:
+                        if val < price:
+                            supports.append((val, label))
+                        elif val > price:
+                            resistances.append((val, label))
+                    
+                    # 2. เรียงลำดับ (Sorting)
+                    # แนวรับ: เรียงมากไปน้อย (ใกล้ราคาปัจจุบันที่สุด อยู่บนสุด)
+                    supports.sort(key=lambda x: x[0], reverse=True)
+                    
+                    # แนวต้าน: เรียงน้อยไปมาก (ใกล้ราคาปัจจุบันที่สุด อยู่บนสุด)
+                    resistances.sort(key=lambda x: x[0])
 
-                    st.markdown("#### 🟢 แนวรับ")
-                    for v, d in supports: 
-                        if v < price: st.write(f"- **{v:.2f}** : {d}")
-                    st.markdown("#### 🔴 แนวต้าน")
-                    for v, d in resistances:
-                        if v > price: st.write(f"- **{v:.2f}** : {d}")
+                    st.markdown("#### 🟢 แนวรับ (จุดรอซื้อ)")
+                    if supports:
+                        for v, d in supports: st.write(f"- **{v:.2f}** : {d}")
+                    else: st.write("- ไม่มีแนวรับใกล้เคียง (New High?)")
+
+                    st.markdown("#### 🔴 แนวต้าน (จุดรอขาย)")
+                    if resistances:
+                        for v, d in resistances: st.write(f"- **{v:.2f}** : {d}")
+                    else: st.write("- ไม่มีแนวต้านใกล้เคียง (New Low?)")
 
                 with c_ai:
                     st.subheader("🤖 AI ADVANCED ANALYSIS")
