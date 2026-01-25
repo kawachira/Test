@@ -6,10 +6,10 @@ import numpy as np
 import time
 from datetime import datetime
 
-# --- 1. ตั้งค่าหน้าเว็บ (คงเดิม 100%) ---
+# --- 1. ตั้งค่าหน้าเว็บ (คงเดิม) ---
 st.set_page_config(page_title="AI Stock Master", page_icon="💎", layout="wide")
 
-# --- 2. CSS ปรับแต่ง (คงเดิม 100%) ---
+# --- 2. CSS ปรับแต่ง (คงเดิม) ---
 st.markdown("""
     <style>
     body { overflow-x: hidden; }
@@ -37,7 +37,7 @@ st.markdown("""
 # --- 3. ส่วนหัวข้อ (คงเดิม) ---
 st.markdown("<h1>💎 Ai<br><span style='font-size: 1.5rem; opacity: 0.7;'>ระบบวิเคราะห์หุ้นอัจฉริยะ (Hybrid Sniper)</span></h1>", unsafe_allow_html=True)
 
-# --- Form ค้นหา (คงเดิม + Logic เลือก TF ใหม่) ---
+# --- Form ค้นหา (คงเดิม) ---
 col_space1, col_form, col_space2 = st.columns([1, 2, 1])
 with col_form:
     with st.form(key='search_form'):
@@ -47,7 +47,6 @@ with col_form:
             symbol_input = st.text_input("ชื่อหุ้น (เช่น AMZN,EOSE,RKLB,TSLA)🪐", value="").upper().strip()
         with c2:
             timeframe = st.selectbox("Timeframe:", ["1h (รายชั่วโมง)", "1d (รายวัน)", "1wk (รายสัปดาห์)"], index=1)
-            # Logic: 1h->Day, Day->Week, Week->Month
             if "1wk" in timeframe: tf_code = "1wk"; mtf_code = "1mo"
             elif "1h" in timeframe: tf_code = "1h"; mtf_code = "1d"
             else: tf_code = "1d"; mtf_code = "1wk"
@@ -56,15 +55,17 @@ with col_form:
         realtime_mode = st.checkbox("🔴 เปิดโหมด Real-time (ราคาขยับเองทุก 10 วิ)", value=False)
         submit_btn = st.form_submit_button("🚀 วิเคราะห์ทันที / รีเฟรชข้อมูล")
 
-# --- 4. Helper Functions (คงเดิมทั้งหมด) ---
+# --- 4. Helper Functions (อัปเกรด Logic การแสดงผล) ---
 def arrow_html(change):
     if change is None: return ""
     return "<span style='color:#16a34a;font-weight:600'>▲</span>" if change > 0 else "<span style='color:#dc2626;font-weight:600'>▼</span>"
 
 def custom_metric_html(label, value, status_text, color_status, icon_svg):
+    # กำหนดสี Hex Code ให้แม่นยำ
     if color_status == "green": color_code = "#16a34a"
     elif color_status == "red": color_code = "#dc2626"
-    else: color_code = "#6b7280"
+    else: color_code = "#a3a3a3" # สีเทาแบบสว่างนิดนึง ให้เห็นชัดบน Dark Mode
+    
     html = f"""
     <div style="margin-bottom: 15px;">
         <div style="display: flex; align-items: baseline; gap: 10px; margin-bottom: 5px;">
@@ -80,13 +81,11 @@ def custom_metric_html(label, value, status_text, color_status, icon_svg):
     return html
 
 def get_rsi_interpretation(rsi):
-    if rsi >= 80: return "Extreme Overbought (80+): ระวังแรงขายรุนแรง"
-    elif rsi >= 70: return "Overbought (70-80): ราคาตึงตัว อาจพักฐาน"
-    elif rsi >= 55: return "Bullish Zone (55-70): โมเมนตัมกระทิงแข็งแกร่ง"
-    elif rsi >= 45: return "Sideway/Neutral (45-55): รอเลือกทาง"
-    elif rsi >= 30: return "Bearish Zone (30-45): โมเมนตัมหมีครองตลาด"
-    elif rsi > 20: return "Oversold (20-30): เริ่มเข้าเขตของถูก"
-    else: return "Extreme Oversold (<20): ลงลึกมาก ลุ้นเด้ง"
+    if rsi >= 70: return "Overbought (ระวังแรงขาย)"
+    elif rsi >= 55: return "Bullish (กระทิงแข็งแกร่ง)"
+    elif rsi >= 45: return "Sideway/Neutral (รอเลือกทาง)"
+    elif rsi >= 30: return "Bearish (หมีครองตลาด)"
+    else: return "Oversold (ระวังเด้งสวน)"
 
 def get_pe_interpretation(pe):
     if isinstance(pe, str) and pe == 'N/A': return "N/A"
@@ -95,36 +94,44 @@ def get_pe_interpretation(pe):
     if pe < 30: return "ราคาเหมาะสม (Fair)"
     return "หุ้นแพง (Growth)"
 
+# --- อัปเกรด: แบ่งระดับ ADX ละเอียด 4 ระดับ ---
 def get_adx_interpretation(adx):
-    if adx >= 50: return "Super Strong Trend: เทรนด์แรงมาก"
-    if adx >= 25: return "Strong Trend: มีเทรนด์ชัดเจน"
-    return "Weak Trend/Sideway: ตลาดไร้ทิศทาง"
+    if adx >= 50: return "Super Strong Trend (เทรนด์แรงมาก)"
+    if adx >= 25: return "Strong Trend (มีเทรนด์ชัดเจน)"
+    if adx >= 20: return "Developing Trend (เริ่มก่อตัว)"
+    return "Weak/Sideway (ตลาดไร้ทิศทาง)"
 
 def get_detailed_explanation(adx, rsi, macd_val, macd_signal, price, ema200):
+    # ADX Explanation Updated
     if adx >= 50: adx_str = "ระดับ 'รุนแรงมาก' (Super Strong)"
     elif adx >= 25: adx_str = "ระดับ 'แข็งแกร่ง' (Strong)"
     elif adx >= 20: adx_str = "ระดับ 'กำลังก่อตัว' (Developing)"
     else: adx_str = "ระดับ 'อ่อนแอ/ไม่มีเทรนด์' (Weak)"
+    
     if price > ema200: trend_dir = "ขาขึ้น (Uptrend)"
     else: trend_dir = "ขาลง (Downtrend)"
+        
     adx_explain = f"ค่า **{adx:.2f}** อยู่ใน{adx_str} เมื่อรวมกับทิศทางที่เป็น **{trend_dir}** จึงสรุปได้ว่าตลาดกำลังมี **{trend_dir} ที่{adx_str.split("'")[1]}**"
-    if rsi >= 70: rsi_explain = f"ค่า **{rsi:.2f}** สูงเกิน 70 แปลว่าราคา **'แพงเกินไป' (Overbought)** คนแห่ซื้อกันจนเสี่ยงที่จะโดนเทขาย"
-    elif rsi <= 30: rsi_explain = f"ค่า **{rsi:.2f}** ต่ำกว่า 30 แปลว่าราคา **'ถูกเกินไป' (Oversold)** คนแห่ขายจนน่าจะมีแรงซื้อสวนกลับมา"
-    else: rsi_explain = f"ค่า **{rsi:.2f}** อยู่ในช่วงกลางๆ (40-60) แปลว่าราคาสมเหตุสมผล"
-    if macd_val > macd_signal: macd_explain = f"ค่า **{macd_val:.3f}** ตัดขึ้นเหนือเส้น Signal แปลว่า **'แรงซื้อชนะแรงขาย'** โมเมนตัมเป็นบวก"
-    else: macd_explain = f"ค่า **{macd_val:.3f}** ตัดลงต่ำกว่าเส้น Signal แปลว่า **'แรงขายชนะแรงซื้อ'** โมเมนตัมเป็นลบ"
+
+    if rsi >= 70: rsi_explain = f"ค่า **{rsi:.2f}** สูงเกิน 70 (Overbought) ระวังแรงขายทำกำไร"
+    elif rsi <= 30: rsi_explain = f"ค่า **{rsi:.2f}** ต่ำกว่า 30 (Oversold) ระวังแรงซื้อสวนกลับ"
+    else: rsi_explain = f"ค่า **{rsi:.2f}** อยู่ในช่วงกลาง (Neutral) ราคาสมเหตุสมผล"
+
+    if macd_val > macd_signal: macd_explain = f"ค่า **{macd_val:.3f}** ตัดขึ้นเหนือ Signal (Bullish Momentum)"
+    else: macd_explain = f"ค่า **{macd_val:.3f}** ตัดลงต่ำกว่า Signal (Bearish Momentum)"
+
     return adx_explain, rsi_explain, macd_explain
 
 def display_learning_section(rsi, rsi_interp, macd_val, macd_signal, macd_interp, adx_val, adx_interp, price, bb_upper, bb_lower):
     st.markdown("### 📘 มุมความรู้: ค่าต่างๆ คืออะไร? มาจากไหน?")
     with st.expander("คลิกเพื่อเรียนรู้ความหมายของอินดิเคเตอร์แต่ละตัว", expanded=False):
-        st.markdown(f"#### 1. MACD (Moving Average Convergence Divergence)\n* **ค่าปัจจุบัน:** `{macd_val:.3f}` -> {macd_interp}\n* **คืออะไร?:** เครื่องมือดู 'โมเมนตัม' หรือแรงส่งของราคา")
+        st.markdown(f"#### 1. MACD (Moving Average Convergence Divergence)\n* **ค่าปัจจุบัน:** `{macd_val:.3f}` -> {macd_interp}")
         st.divider()
-        st.markdown(f"#### 2. RSI (Relative Strength Index)\n* **ค่าปัจจุบัน:** `{rsi:.2f}` -> {rsi_interp}\n* **คืออะไร?:** ดัชนีวัดการ 'ซื้อมากเกินไป' หรือ 'ขายมากเกินไป'")
+        st.markdown(f"#### 2. RSI (Relative Strength Index)\n* **ค่าปัจจุบัน:** `{rsi:.2f}` -> {rsi_interp}")
         st.divider()
-        st.markdown(f"#### 3. ADX (Average Directional Index)\n* **ค่าปัจจุบัน:** `{adx_val:.2f}` -> {adx_interp}\n* **คืออะไร?:** เครื่องมือวัด 'ความรุนแรงของเทรนด์' (ไม่บอกทิศทาง บอกแค่ว่าแรงไหม)")
+        st.markdown(f"#### 3. ADX (Average Directional Index)\n* **ค่าปัจจุบัน:** `{adx_val:.2f}` -> {adx_interp}")
         st.divider()
-        st.markdown(f"#### 4. Bollinger Bands (BB)\n* **Upper:** `{bb_upper:.2f}` | **Lower:** `{bb_lower:.2f}`\n* **คืออะไร?:** กรอบการแกว่งตัวของราคาเปรียบเหมือนขอบถนน")
+        st.markdown(f"#### 4. Bollinger Bands (BB)\n* **Upper:** `{bb_upper:.2f}` | **Lower:** `{bb_lower:.2f}`")
 
 # --- 5. Data Fetching (Hybrid) ---
 @st.cache_data(ttl=10, show_spinner=False)
@@ -132,14 +139,9 @@ def get_data_hybrid(symbol, interval, mtf_interval):
     try:
         ticker = yf.Ticker(symbol)
         period_val = "730d" if interval == "1h" else "10y"
-        
-        # 1. Main Data
         df = ticker.history(period=period_val, interval=interval)
-        # 2. MTF Data
         df_mtf = ticker.history(period="5y", interval=mtf_interval)
-        # 3. News
         news = ticker.news
-        # 4. Info (Preserve Structure)
         stock_info = {
             'longName': ticker.info.get('longName', symbol),
             'marketState': ticker.info.get('marketState', 'UNKNOWN'),
@@ -166,7 +168,7 @@ def get_data_hybrid(symbol, interval, mtf_interval):
     except:
         return None, None, None, None
 
-# --- 6. Analysis Logic (Sniper Logic Added) ---
+# --- 6. Analysis Logic (Sniper Logic) ---
 def analyze_volume(row, vol_ma):
     vol = row['Volume']
     if vol > vol_ma * 1.5: return "High Volume", "green"
@@ -283,7 +285,6 @@ if submit_btn:
 
                 adx = ta.adx(df['High'], df['Low'], df['Close'], length=14)
                 df = pd.concat([df, adx], axis=1)
-                
                 df['Vol_SMA20'] = ta.sma(df['Volume'], length=20)
 
                 # Last Values
@@ -306,12 +307,10 @@ if submit_btn:
                 mtf_trend = "Sideway"
                 mtf_ema200_val = 0
                 
-                # MTF EMA 200 & 50 Calculation
                 if df_mtf is not None and not df_mtf.empty and len(df_mtf) > 50:
                     df_mtf['EMA50'] = ta.ema(df_mtf['Close'], length=50)
                     if df_mtf['Close'].iloc[-1] > df_mtf['EMA50'].iloc[-1]: mtf_trend = "Bullish"
                     else: mtf_trend = "Bearish"
-                    
                     if len(df_mtf) > 200:
                         df_mtf['EMA200'] = ta.ema(df_mtf['Close'], length=200)
                         mtf_ema200_val = df_mtf['EMA200'].iloc[-1]
@@ -334,7 +333,6 @@ if submit_btn:
                         prev_c = reg_price - reg_chg
                         reg_pct = (reg_chg / prev_c) * 100 if prev_c != 0 else 0.0
                     else: reg_pct = 0.0
-                    
                     color_text = "#16a34a" if reg_chg and reg_chg > 0 else "#dc2626"
                     bg_color = "#e8f5ec" if reg_chg and reg_chg > 0 else "#fee2e2"
                     
@@ -345,7 +343,6 @@ if submit_btn:
                     </div>
                     """, unsafe_allow_html=True)
                     
-                    # OHLC + Pre/Post
                     def make_pill(change, percent):
                         color = "#16a34a" if change >= 0 else "#dc2626"
                         bg = "#e8f5ec" if change >= 0 else "#fee2e2"
@@ -377,28 +374,53 @@ if submit_btn:
                 elif st_color == "red": c2.error(f"📉 {main_status}\n\n**{tf_label}**")
                 else: c2.warning(f"⚖️ {main_status}\n\n**{tf_label}**")
 
+                # --- Metrics Section (SMART SYNC FIX) ---
                 c3, c4, c5 = st.columns(3)
+                
+                # SVG Icons
                 icon_up_svg = """<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#16a34a" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5"/><path d="M5 12l7-7 7 7"/></svg>"""
                 icon_down_svg = """<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#dc2626" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14"/><path d="M5 12l7 7 7-7"/></svg>"""
-                icon_flat_svg = """<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="#6b7280"><circle cx="12" cy="12" r="10"/></svg>"""
-                icon_wave_svg = """<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#6b7280" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 15l3-3-3-3"/><path d="M6 9l-3 3 3 3"/><path d="M21 12H3"/></svg>"""
+                icon_wave_svg = """<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#a3a3a3" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12c0-1.5 1-2 2.5-2s2 1 3 1 2-1 3.5-1 2 1 3.5 1 2-1 3-1 2.5.5 2.5 2"/><path d="M4 12v0"/></svg>"""
+                icon_flat_svg = """<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="#a3a3a3"><circle cx="12" cy="12" r="10"/></svg>"""
 
+                # 1. P/E Ratio
                 with c3:
                     pe_val = info['trailingPE']
                     pe_str = f"{pe_val:.2f}" if isinstance(pe_val, (int, float)) else "N/A"
                     pe_interp = get_pe_interpretation(pe_val)
                     if isinstance(pe_val, (int,float)):
-                        pe_color = "green" if pe_val > 0 and pe_val < 30 else "red"
-                        pe_icon = icon_up_svg if pe_val < 30 else icon_down_svg
+                        if pe_val < 0: pe_color = "red"; pe_icon = icon_down_svg
+                        elif pe_val < 15: pe_color = "green"; pe_icon = icon_up_svg
+                        elif pe_val < 30: pe_color = "green"; pe_icon = icon_flat_svg
+                        else: pe_color = "red"; pe_icon = icon_down_svg
                     else: pe_color = "gray"; pe_icon = icon_flat_svg
                     st.markdown(custom_metric_html("📊 P/E Ratio", pe_str, pe_interp, pe_color, pe_icon), unsafe_allow_html=True)
+
+                # 2. RSI (Logic Fix: Color & Icon Sync)
                 with c4:
-                    rsi_interp = get_rsi_interpretation(rsi)
-                    c_stat = "red" if rsi >= 70 or rsi <= 30 else "green"
-                    st.markdown(custom_metric_html("⚡ RSI (14)", f"{rsi:.2f}", rsi_interp, c_stat, icon_up_svg), unsafe_allow_html=True)
+                    rsi_text = get_rsi_interpretation(rsi)
+                    if rsi >= 70: 
+                        rsi_color = "red"; rsi_icon = icon_up_svg # High but risky
+                    elif rsi >= 55:
+                        rsi_color = "green"; rsi_icon = icon_up_svg
+                    elif rsi >= 45:
+                        rsi_color = "gray"; rsi_icon = icon_wave_svg
+                    elif rsi >= 30:
+                        rsi_color = "red"; rsi_icon = icon_down_svg # Bearish
+                    else:
+                        rsi_color = "red"; rsi_icon = icon_down_svg # Low/Oversold
+                    st.markdown(custom_metric_html("⚡ RSI (14)", f"{rsi:.2f}", rsi_text, rsi_color, rsi_icon), unsafe_allow_html=True)
+
+                # 3. ADX (Logic Fix: 4 Levels)
                 with c5:
-                    adx_interp = get_adx_interpretation(adx_val)
-                    st.markdown(custom_metric_html("💪 ADX Strength", f"{adx_val:.2f}", adx_interp, "green" if adx_val>25 else "gray", icon_wave_svg), unsafe_allow_html=True)
+                    adx_text = get_adx_interpretation(adx_val)
+                    if adx_val >= 25:
+                        adx_color = "green"; adx_icon = icon_up_svg # Strong/Super Strong
+                    elif adx_val >= 20:
+                        adx_color = "gray"; adx_icon = icon_wave_svg # Developing (Still gray zone)
+                    else:
+                        adx_color = "gray"; adx_icon = icon_wave_svg # Weak
+                    st.markdown(custom_metric_html("💪 ADX Strength", f"{adx_val:.2f}", adx_text, adx_color, adx_icon), unsafe_allow_html=True)
 
                 st.write("") 
 
@@ -416,26 +438,23 @@ if submit_btn:
                     </div>
                     """, unsafe_allow_html=True)
                     
-                    # --- UPDATED SMART KEY LEVELS LOGIC (SNIPER MODE) ---
                     st.subheader("🚧 Key Levels (Smart Filter)")
-                    
                     low_60d = df['Low'].tail(60).min()
                     high_60d = df['High'].tail(60).max()
                     mtf_label_str = f"EMA 200 ({mtf_code.upper()})" if mtf_ema200_val > 0 else "MTF EMA 200 (N/A)"
-
-                    # 1. Define Potential Supports (เพิ่ม EMA 50/20)
+                    
+                    # Sniper Supports Logic
                     potential_supports = [
                         (bb_lower, "BB Lower (Volatility)"),
                         (low_60d, "Low 60 Days (Price Action)"),
                         (ema200, "EMA 200 (Trend Wall)"),
                         (mtf_ema200_val, mtf_label_str),
-                        (ema50, "EMA 50 (Short Trend)"), # Sniper
-                        (ema20, "EMA 20 (Momentum)")     # Sniper
+                        (ema50, "EMA 50 (Short Trend)"),
+                        (ema20, "EMA 20 (Momentum)")
                     ]
-                    # 2. Sort: < price, closest first
                     valid_supports = sorted([x for x in potential_supports if x[0] < price and x[0] > 0], key=lambda x: x[0], reverse=True)
-
-                    # 3. Define Potential Resistances
+                    
+                    # Resistances
                     potential_resistances = [
                         (ema20, "EMA 20 (Momentum)"),
                         (ema50, "EMA 50 (Short Trend)"),
@@ -443,18 +462,15 @@ if submit_btn:
                         (bb_upper, "BB Upper (Ceiling)"),
                         (high_60d, "High 60 Days (Peak)")
                     ]
-                    # 4. Sort: > price, closest first
                     valid_resistances = sorted([x for x in potential_resistances if x[0] > price and x[0] > 0], key=lambda x: x[0])
                     
                     st.markdown("#### 🟢 แนวรับ (Strategic Supports)")
                     if valid_supports:
-                        count = 0
-                        used_vals = []
+                        count = 0; used_vals = []
                         for v, d in valid_supports:
                             if not any(abs(v - uv) < 0.05 for uv in used_vals): 
                                 st.write(f"- **{v:.2f}** : {d}")
-                                used_vals.append(v)
-                                count += 1
+                                used_vals.append(v); count += 1
                             if count >= 3: break
                     else: st.write("- ราคาทำ All Time High / ไม่มีแนวรับใกล้เคียง")
                     
