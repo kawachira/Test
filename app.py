@@ -94,10 +94,9 @@ def get_pe_interpretation(pe):
     if pe < 30: return "ราคาเหมาะสม (Fair)"
     return "หุ้นแพง (Growth)"
 
-# --- [UPDATED] Smart ADX Interpretation (4 Levels + Direction) ---
+# --- Smart ADX Interpretation ---
 def get_adx_interpretation(adx, is_uptrend):
     trend_str = "ขาขึ้น (Uptrend)" if is_uptrend else "ขาลง (Downtrend)"
-    
     if adx >= 50: return f"Super Strong {trend_str} (แรงมาก)"
     if adx >= 25: return f"Strong {trend_str} (แข็งแกร่ง)"
     if adx >= 20: return "Developing Trend (เริ่มก่อตัว)"
@@ -137,7 +136,7 @@ def display_learning_section(rsi, rsi_interp, macd_val, macd_signal, macd_interp
         st.divider()
         st.markdown(f"#### 4. Bollinger Bands (BB)\n* **Upper:** `{bb_upper:.2f}` | **Lower:** `{bb_lower:.2f}`")
 
-# --- 5. Data Fetching (คงเดิม) ---
+# --- 5. Data Fetching ---
 @st.cache_data(ttl=10, show_spinner=False)
 def get_data_hybrid(symbol, interval, mtf_interval):
     try:
@@ -172,7 +171,7 @@ def get_data_hybrid(symbol, interval, mtf_interval):
     except:
         return None, None, None, None
 
-# --- 6. Analysis Logic (คงเดิม) ---
+# --- 6. Analysis Logic ---
 def analyze_volume(row, vol_ma):
     vol = row['Volume']
     if vol > vol_ma * 1.5: return "High Volume", "green"
@@ -192,7 +191,7 @@ def analyze_news_sentiment(news_list):
             if w in title: score -= 1
     return score
 
-# --- 7. AI Decision Engine (คงเดิม) ---
+# --- 7. AI Decision Engine ---
 def ai_hybrid_analysis(price, ema20, ema50, ema200, rsi, macd_val, macd_sig, adx, bb_up, bb_low, 
                        vol_status, mtf_trend, news_score, atr_val):
     score = 0
@@ -378,7 +377,7 @@ if submit_btn:
                 elif st_color == "red": c2.error(f"📉 {main_status}\n\n**{tf_label}**")
                 else: c2.warning(f"⚖️ {main_status}\n\n**{tf_label}**")
 
-                # --- Metrics Section (SMART ADX - 4 Levels & Direction) ---
+                # --- Metrics Section ---
                 c3, c4, c5 = st.columns(3)
                 
                 # SVG Icons
@@ -511,7 +510,11 @@ if submit_btn:
                 st.write("")
                 st.markdown("""<div class='disclaimer-box'>⚠️ <b>หมายเหตุ:</b> ข้อมูลนี้มาจากการวิเคราะห์ทางเทคนิคด้วยระบบ AI (Hybrid Logic) เพื่อประกอบการตัดสินใจเท่านั้น <br>ผู้ใช้งานควรศึกษาก่อนการลงทุน ผู้พัฒนาไม่รับผิดชอบต่อความเสียหายใดๆ ที่เกิดขึ้นจากการนำข้อมูลนี้ไปใช้</div>""", unsafe_allow_html=True)
                 st.divider()
+                
+                # --- FIXED: Define Variables before calling function ---
                 rsi_interp_str = get_rsi_interpretation(rsi)
+                macd_interp_str = "🟢 Bullish" if macd_val > macd_signal else "🔴 Bearish" # ประกาศตัวแปรที่ขาดหายไปตรงนี้ครับ
+                
                 display_learning_section(rsi, rsi_interp_str, macd_val, macd_signal, macd_interp_str, adx_val, price, ema200, bb_upper, bb_lower)
             else:
                 st.error("ไม่พบข้อมูลหุ้น หรือ ข้อมูลไม่เพียงพอสำหรับคำนวณ Indicator (ต้องมีมากกว่า 200 แท่งเทียน)")
