@@ -31,11 +31,6 @@ st.markdown("""
         border: 2px solid #ffc107; border-radius: 12px;
         font-size: 0.9rem; color: #5d4037; text-align: center;
     }
-    .metric-card {
-        background-color: var(--secondary-background-color);
-        padding: 15px; border-radius: 10px; box-shadow: 0 2px 4px rgba(0,0,0,0.05);
-        text-align: center; height: 100%;
-    }
     </style>
     """, unsafe_allow_html=True)
 
@@ -52,19 +47,16 @@ with col_form:
             symbol_input = st.text_input("ชื่อหุ้น (เช่น NVDA, TSLA, AAPL)🪐", value="").upper().strip()
         with c2:
             timeframe = st.selectbox("Timeframe:", ["1h (รายชั่วโมง)", "1d (รายวัน)", "1wk (รายสัปดาห์)"], index=1)
-            if "1wk" in timeframe: tf_code = "1wk"; mtf_code = "1mo" # ถ้าเลือก Week ดู Month ประกอบ
-            elif "1h" in timeframe: tf_code = "1h"; mtf_code = "1d"   # ถ้าเลือก Hour ดู Day ประกอบ
-            else: tf_code = "1d"; mtf_code = "1wk"                    # ถ้าเลือก Day ดู Week ประกอบ
+            # ตั้งค่า Timeframe หลัก และ Timeframe รอง (MTF)
+            if "1wk" in timeframe: tf_code = "1wk"; mtf_code = "1mo" 
+            elif "1h" in timeframe: tf_code = "1h"; mtf_code = "1d"   
+            else: tf_code = "1d"; mtf_code = "1wk"                    
         
         st.markdown("---")
         realtime_mode = st.checkbox("🔴 Real-time Mode (Refresh 10s)", value=False)
         submit_btn = st.form_submit_button("🚀 วิเคราะห์เชิงลึก (AI Full Loop)")
 
 # --- 4. Helper Functions (Display) ---
-def arrow_html(change):
-    if change is None: return ""
-    return "<span style='color:#16a34a;font-weight:600'>▲</span>" if change > 0 else "<span style='color:#dc2626;font-weight:600'>▼</span>"
-
 def custom_metric_html(label, value, status_text, color_status, icon_svg):
     if color_status == "green": color_code = "#16a34a"
     elif color_status == "red": color_code = "#dc2626"
@@ -101,12 +93,17 @@ def get_data_pro(symbol, main_tf, mtf_tf):
         news = ticker.news
         
         # 4. Info
+        info = ticker.info
+        current_price = info.get('regularMarketPrice')
+        if current_price is None and not df.empty:
+            current_price = df['Close'].iloc[-1]
+
         stock_info = {
-            'longName': ticker.info.get('longName', symbol),
-            'currentPrice': ticker.info.get('regularMarketPrice', df['Close'].iloc[-1]),
-            'marketCap': ticker.info.get('marketCap', 'N/A'),
-            'sector': ticker.info.get('sector', 'Unknown'),
-            'pe': ticker.info.get('trailingPE', 0)
+            'longName': info.get('longName', symbol),
+            'currentPrice': current_price,
+            'marketCap': info.get('marketCap', 'N/A'),
+            'sector': info.get('sector', 'Unknown'),
+            'pe': info.get('trailingPE', 0)
         }
         
         return df, df_mtf, news, stock_info
@@ -151,8 +148,8 @@ def analyze_news_sentiment(news_list):
     if not news_list: return "No News", 0
     
     score = 0
-    bullish_keywords = ['soar', 'jump', 'surge', 'beat', 'profit', 'growth', 'buy', 'upgrade', 'record', 'gain']
-    bearish_keywords = ['drop', 'fall', 'plunge', 'miss', 'loss', 'down', 'sell', 'downgrade', 'lawsuit', 'crash']
+    bullish_keywords = ['soar', 'jump', 'surge', 'beat', 'profit', 'growth', 'buy', 'upgrade', 'record', 'gain', 'strong']
+    bearish_keywords = ['drop', 'fall', 'plunge', 'miss', 'loss', 'down', 'sell', 'downgrade', 'lawsuit', 'crash', 'weak']
     
     relevant_news = []
     
@@ -167,10 +164,9 @@ def analyze_news_sentiment(news_list):
             if word in title:
                 score -= 1
                 found = True
-        if found: relevant_news.append(item.get('title'))
             
-    if score >= 2: return "Positive (ข่าวดี)", score
-    elif score <= -2: return "Negative (ข่าวร้าย)", score
+    if score >= 1: return "Positive (ข่าวดี)", score
+    elif score <= -1: return "Negative (ข่าวร้าย)", score
     else: return "Neutral (ข่าวทรงๆ)", score
 
 # --- 7. The SUPER AI Decision Engine ---
@@ -303,153 +299,178 @@ def ai_decision_engine(
 if submit_btn:
     st.divider()
     
-    with st.spinner(f"🤖 AI Pro กำลังรวบรวมข้อมูล Big Data และวิเคราะห์ {symbol_input}..."):
-        # 1. Fetch Data
-        df, df_mtf, news, info = get_data_pro(symbol_input, tf_code, mtf_code)
-    
-    if df is None or df.empty or len(df) < 200:
-        st.error("❌ ไม่พบข้อมูลหุ้น หรือข้อมูลไม่เพียงพอสำหรับการวิเคราะห์ขั้นสูง")
-    else:
-        # 2. Calculate Indicators (Batch Calculation)
-        # Main Timeframe
-        df['EMA20'] = ta.ema(df['Close'], length=20)
-        df['EMA50'] = ta.ema(df['Close'], length=50)
-        df['EMA200'] = ta.ema(df['Close'], length=200)
-        df['RSI'] = ta.rsi(df['Close'], length=14)
-        df['ATR'] = ta.atr(df['High'], df['Low'], df['Close'], length=14)
+    while True:
+        with st.spinner(f"🤖 AI Pro กำลังรวบรวมข้อมูล Big Data และวิเคราะห์ {symbol_input}..."):
+            # 1. Fetch Data
+            df, df_mtf, news, info = get_data_pro(symbol_input, tf_code, mtf_code)
         
-        macd = ta.macd(df['Close'])
-        df = pd.concat([df, macd], axis=1)
-        
-        bb = ta.bbands(df['Close'], length=20, std=2)
-        df = pd.concat([df, bb], axis=1)
-        
-        adx = ta.adx(df['High'], df['Low'], df['Close'], length=14)
-        df = pd.concat([df, adx], axis=1)
-        
-        # Volume Indicators
-        df['Vol_SMA20'] = ta.sma(df['Volume'], length=20)
-        df['OBV'] = ta.obv(df['Close'], df['Volume'])
-        
-        # MTF Calculation (Simplified Trend Check)
-        mtf_trend = "Sideway"
-        if not df_mtf.empty and len(df_mtf) > 50:
-            df_mtf['EMA50'] = ta.ema(df_mtf['Close'], length=50)
-            last_mtf = df_mtf.iloc[-1]
-            if last_mtf['Close'] > last_mtf['EMA50']: mtf_trend = "Bullish"
-            elif last_mtf['Close'] < last_mtf['EMA50']: mtf_trend = "Bearish"
-
-        # 3. Extract Latest Data
-        last = df.iloc[-1]
-        prev = df.iloc[-2]
-        
-        price = info['currentPrice']
-        rsi = last['RSI']
-        atr = last['ATRr_14']
-        
-        # Extract MACD/ADX/BB safely
-        macd_val = last.get('MACD_12_26_9', 0)
-        macd_sig = last.get('MACDs_12_26_9', 0)
-        adx_val = last.get('ADX_14', 0)
-        bb_up = last.get('BBU_20_2.0', price * 1.05)
-        bb_low = last.get('BBL_20_2.0', price * 0.95)
-        
-        # 4. Specific Analysis Calls
-        vol_status, vol_color = analyze_volume(last, last['Vol_SMA20'])
-        candle_pattern, candle_color = identify_candlestick(last['Open'], last['High'], last['Low'], last['Close'], last['ATRr_14'])
-        news_sentiment, news_score = analyze_news_sentiment(news)
-        obv_slope = last['OBV'] - df['OBV'].iloc[-5] # ดูความชัน OBV 5 วันย้อนหลัง
-
-        # 5. Run AI Engine
-        ai_result = ai_decision_engine(
-            price, last['EMA20'], last['EMA50'], last['EMA200'],
-            rsi, macd_val, macd_sig, adx_val,
-            bb_up, bb_low,
-            vol_status, obv_slope,
-            mtf_trend,
-            candle_pattern, candle_color,
-            atr
-        )
-
-        # --- DISPLAY SECTION ---
-        
-        # Header & Price
-        logo_url = f"https://financialmodelingprep.com/image-stock/{symbol_input}.png"
-        st.markdown(f"""
-        <div style="display:flex; justify-content:center; align-items:center; gap:15px; margin-bottom: 20px;">
-            <img src="{logo_url}" style="height:60px; border-radius:50%; border:2px solid #eee;">
-            <div>
-                <h1 style="margin:0; text-align:left;">{symbol_input}</h1>
-                <span style="font-size:1.2rem; color:gray;">{info['longName']} | Sector: {info['sector']}</span>
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
-
-        # Dashboard Metrics
-        m1, m2, m3, m4 = st.columns(4)
-        with m1:
-            st.markdown(custom_metric_html("💰 Price", f"{price:.2f}", f"EMA20: {last['EMA20']:.2f}", "green" if price > last['EMA20'] else "red", ""), unsafe_allow_html=True)
-        with m2:
-            st.markdown(custom_metric_html("📊 Volume", vol_status.split(" ")[0], vol_status.split("(")[1].replace(")",""), vol_color, ""), unsafe_allow_html=True)
-        with m3:
-            st.markdown(custom_metric_html("🕯️ Pattern", candle_pattern.split(" ")[0], candle_pattern.split("(")[1].replace(")","") if "(" in candle_pattern else "", candle_color, ""), unsafe_allow_html=True)
-        with m4:
-            sent_color = "green" if news_score > 0 else "red" if news_score < 0 else "gray"
-            st.markdown(custom_metric_html("📰 Sentiment", news_sentiment.split(" ")[0], f"Score: {news_score}", sent_color, ""), unsafe_allow_html=True)
-
-        # Main Strategy Banner
-        st.markdown("---")
-        strat_color = "success" if ai_result['score'] > 2 else "error" if ai_result['score'] < -2 else "warning"
-        
-        if strat_color == "success": st.success(f"## {ai_result['strategy']}")
-        elif strat_color == "error": st.error(f"## {ai_result['strategy']}")
-        else: st.warning(f"## {ai_result['strategy']}")
-        
-        # Deep Dive Analysis
-        c_chart, c_logic = st.columns([1.5, 2])
-        
-        with c_chart:
-            st.subheader("📉 Risk Management (ATR Based)")
-            st.info(f"""
-            **🎯 แผนการเทรด (Trade Setup):**
+        if df is None or df.empty or len(df) < 200:
+            st.error("❌ ไม่พบข้อมูลหุ้น หรือข้อมูลไม่เพียงพอสำหรับการวิเคราะห์ขั้นสูง (ต้องมี Data > 200 แท่ง)")
+            break
+        else:
+            # 2. Calculate Indicators (Batch Calculation)
+            # Main Timeframe
+            df['EMA20'] = ta.ema(df['Close'], length=20)
+            df['EMA50'] = ta.ema(df['Close'], length=50)
+            df['EMA200'] = ta.ema(df['Close'], length=200)
+            df['RSI'] = ta.rsi(df['Close'], length=14)
             
-            * **Entry:** {price:.2f} (ราคาปัจจุบัน)
-            * **🛑 Stop Loss:** **{ai_result['sl']:.2f}** (ระยะห่าง {price - ai_result['sl']:.2f})
-            * **✅ Take Profit:** **{ai_result['tp']:.2f}** (Reward Ratio 1:{abs(ai_result['tp']-price)/abs(price-ai_result['sl']):.1f})
-            * **Volatility (ATR):** {atr:.2f} (หุ้นเหวี่ยงตัวประมาณนี้ต่อแท่ง)
-            """)
+            # --- FIX: Explicitly name the ATR column ---
+            df['ATR'] = ta.atr(df['High'], df['Low'], df['Close'], length=14)
+            # -------------------------------------------
             
-            st.subheader("🌍 Multi-Timeframe Status")
-            mtf_color = "green" if mtf_trend == "Bullish" else "red" if mtf_trend == "Bearish" else "orange"
+            macd = ta.macd(df['Close'])
+            df = pd.concat([df, macd], axis=1)
+            
+            bb = ta.bbands(df['Close'], length=20, std=2)
+            df = pd.concat([df, bb], axis=1)
+            
+            adx = ta.adx(df['High'], df['Low'], df['Close'], length=14)
+            df = pd.concat([df, adx], axis=1)
+            
+            # Volume Indicators
+            df['Vol_SMA20'] = ta.sma(df['Volume'], length=20)
+            df['OBV'] = ta.obv(df['Close'], df['Volume'])
+            
+            # MTF Calculation (Simplified Trend Check)
+            mtf_trend = "Sideway"
+            if df_mtf is not None and not df_mtf.empty and len(df_mtf) > 50:
+                df_mtf['EMA50'] = ta.ema(df_mtf['Close'], length=50)
+                last_mtf = df_mtf.iloc[-1]
+                if last_mtf['Close'] > last_mtf['EMA50']: mtf_trend = "Bullish"
+                elif last_mtf['Close'] < last_mtf['EMA50']: mtf_trend = "Bearish"
+
+            # 3. Extract Latest Data
+            last = df.iloc[-1]
+            prev = df.iloc[-2]
+            
+            price = info['currentPrice']
+            rsi = last['RSI']
+            
+            # --- FIX: Access using the correct column name ---
+            atr = last['ATR'] 
+            # -------------------------------------------------
+            
+            # Extract MACD/ADX/BB safely
+            macd_val = last.get('MACD_12_26_9', 0)
+            macd_sig = last.get('MACDs_12_26_9', 0)
+            adx_val = last.get('ADX_14', 0)
+            bb_up = last.get('BBU_20_2.0', price * 1.05)
+            bb_low = last.get('BBL_20_2.0', price * 0.95)
+            
+            # 4. Specific Analysis Calls
+            vol_status, vol_color = analyze_volume(last, last['Vol_SMA20'])
+            candle_pattern, candle_color = identify_candlestick(last['Open'], last['High'], last['Low'], last['Close'], atr)
+            news_sentiment, news_score = analyze_news_sentiment(news)
+            
+            # OBV Slope
+            try:
+                obv_slope = last['OBV'] - df['OBV'].iloc[-5] 
+            except:
+                obv_slope = 0
+
+            # 5. Run AI Engine
+            ai_result = ai_decision_engine(
+                price, last['EMA20'], last['EMA50'], last['EMA200'],
+                rsi, macd_val, macd_sig, adx_val,
+                bb_up, bb_low,
+                vol_status, obv_slope,
+                mtf_trend,
+                candle_pattern, candle_color,
+                atr
+            )
+
+            # --- DISPLAY SECTION ---
+            
+            # Header & Price
+            logo_url = f"https://financialmodelingprep.com/image-stock/{symbol_input}.png"
             st.markdown(f"""
-            * **Main TF ({tf_code}):** {ai_result['trend_state']}
-            * **Big Picture ({mtf_code}):** <span style='color:{mtf_color}; font-weight:bold;'>{mtf_trend} Trend</span>
+            <div style="display:flex; justify-content:center; align-items:center; gap:15px; margin-bottom: 20px;">
+                <img src="{logo_url}" onerror="this.style.display='none'" style="height:60px; border-radius:50%; border:2px solid #eee;">
+                <div>
+                    <h1 style="margin:0; text-align:left;">{symbol_input}</h1>
+                    <span style="font-size:1.2rem; color:gray;">{info['longName']} | Sector: {info['sector']}</span>
+                </div>
+            </div>
             """, unsafe_allow_html=True)
 
-        with c_logic:
-            st.subheader("🧠 AI Logic & Reasoning")
-            
-            # Reasons (Pros)
-            if ai_result['reasons']:
-                st.markdown("**✅ ปัจจัยสนับสนุน (Pros):**")
-                for r in ai_result['reasons']: st.markdown(f"- {r}")
-            
-            # Warnings (Cons)
-            if ai_result['warnings']:
-                st.markdown("**⚠️ ปัจจัยเสี่ยง (Cons/Risks):**")
-                for w in ai_result['warnings']: st.markdown(f"- {w}")
-                
+            # Dashboard Metrics
+            m1, m2, m3, m4 = st.columns(4)
+            with m1:
+                st.markdown(custom_metric_html("💰 Price", f"{price:.2f}", f"EMA20: {last['EMA20']:.2f}", "green" if price > last['EMA20'] else "red", ""), unsafe_allow_html=True)
+            with m2:
+                st.markdown(custom_metric_html("📊 Volume", vol_status.split(" ")[0], vol_status.split("(")[1].replace(")",""), vol_color, ""), unsafe_allow_html=True)
+            with m3:
+                st.markdown(custom_metric_html("🕯️ Pattern", candle_pattern.split(" ")[0], candle_pattern.split("(")[1].replace(")","") if "(" in candle_pattern else "", candle_color, ""), unsafe_allow_html=True)
+            with m4:
+                sent_color = "green" if news_score > 0 else "red" if news_score < 0 else "gray"
+                st.markdown(custom_metric_html("📰 Sentiment", news_sentiment.split(" ")[0], f"Score: {news_score}", sent_color, ""), unsafe_allow_html=True)
+
+            # Main Strategy Banner
             st.markdown("---")
-            st.subheader("📝 Action Step")
-            for step in ai_result['action']:
-                st.write(f"👉 {step}")
+            strat_color = "success" if ai_result['score'] > 2 else "error" if ai_result['score'] < -2 else "warning"
+            
+            if strat_color == "success": st.success(f"## {ai_result['strategy']}")
+            elif strat_color == "error": st.error(f"## {ai_result['strategy']}")
+            else: st.warning(f"## {ai_result['strategy']}")
+            
+            # Deep Dive Analysis
+            c_chart, c_logic = st.columns([1.5, 2])
+            
+            with c_chart:
+                st.subheader("📉 Risk Management (ATR Based)")
+                st.info(f"""
+                **🎯 แผนการเทรด (Trade Setup):**
+                
+                * **Entry:** {price:.2f} (ราคาปัจจุบัน)
+                * **🛑 Stop Loss:** **{ai_result['sl']:.2f}** (ระยะห่าง {price - ai_result['sl']:.2f})
+                * **✅ Take Profit:** **{ai_result['tp']:.2f}** (Reward Ratio 1:{abs(ai_result['tp']-price)/abs(price-ai_result['sl']):.1f})
+                * **Volatility (ATR):** {atr:.2f} (หุ้นเหวี่ยงตัวประมาณนี้ต่อแท่ง)
+                """)
+                
+                st.subheader("🌍 Multi-Timeframe Status")
+                mtf_color = "green" if mtf_trend == "Bullish" else "red" if mtf_trend == "Bearish" else "orange"
+                st.markdown(f"""
+                * **Main TF ({tf_code}):** {ai_result['trend_state']}
+                * **Big Picture ({mtf_code}):** <span style='color:{mtf_color}; font-weight:bold;'>{mtf_trend} Trend</span>
+                """, unsafe_allow_html=True)
 
-        # News Expander
-        with st.expander("📰 อ่านหัวข้อข่าวที่ AI ใช้ประเมิน (Click to expand)", expanded=False):
-            if news:
-                for n in news[:5]:
-                    st.write(f"- [{n['title']}]({n['link']}) ({datetime.fromtimestamp(n['providerPublishTime']).strftime('%Y-%m-%d')})")
-            else:
-                st.write("- ไม่มีข้อมูลข่าวล่าสุด")
+            with c_logic:
+                st.subheader("🧠 AI Logic & Reasoning")
+                
+                # Reasons (Pros)
+                if ai_result['reasons']:
+                    st.markdown("**✅ ปัจจัยสนับสนุน (Pros):**")
+                    for r in ai_result['reasons']: st.markdown(f"- {r}")
+                
+                # Warnings (Cons)
+                if ai_result['warnings']:
+                    st.markdown("**⚠️ ปัจจัยเสี่ยง (Cons/Risks):**")
+                    for w in ai_result['warnings']: st.markdown(f"- {w}")
+                    
+                st.markdown("---")
+                st.subheader("📝 Action Step")
+                for step in ai_result['action']:
+                    st.write(f"👉 {step}")
 
-        st.markdown("<div class='disclaimer-box'>⚠️ <b>Disclaimer:</b> ระบบ Pro นี้ใช้ AI Decision Tree ขั้นสูงในการประมวลผลข้อมูล 5 มิติ (Price, Vol, Timeframe, Risk, Sentiment) แต่การลงทุนยังมีความเสี่ยง โปรดใช้ Money Management อย่างเคร่งครัด</div>", unsafe_allow_html=True)
+            # News Expander
+            with st.expander("📰 อ่านหัวข้อข่าวที่ AI ใช้ประเมิน (Click to expand)", expanded=False):
+                if news:
+                    for n in news[:5]:
+                        try:
+                            # Handle different yahoo finance news formats
+                            link = n.get('link', '#')
+                            title = n.get('title', 'No Title')
+                            pub_time = n.get('providerPublishTime', 0)
+                            date_str = datetime.fromtimestamp(pub_time).strftime('%Y-%m-%d')
+                            st.write(f"- [{title}]({link}) ({date_str})")
+                        except:
+                            pass
+                else:
+                    st.write("- ไม่มีข้อมูลข่าวล่าสุด")
+
+            st.markdown("<div class='disclaimer-box'>⚠️ <b>Disclaimer:</b> ระบบ Pro นี้ใช้ AI Decision Tree ขั้นสูงในการประมวลผลข้อมูล 5 มิติ (Price, Vol, Timeframe, Risk, Sentiment) แต่การลงทุนยังมีความเสี่ยง โปรดใช้ Money Management อย่างเคร่งครัด</div>", unsafe_allow_html=True)
+
+        if not realtime_mode: break
+        time.sleep(10)
+        st.rerun()
