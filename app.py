@@ -47,6 +47,7 @@ with col_form:
             symbol_input = st.text_input("ชื่อหุ้น (เช่น AMZN,EOSE,RKLB,TSLA)🪐", value="").upper().strip()
         with c2:
             timeframe = st.selectbox("Timeframe:", ["1h (รายชั่วโมง)", "1d (รายวัน)", "1wk (รายสัปดาห์)"], index=1)
+            # Logic: 1h->Day, Day->Week, Week->Month
             if "1wk" in timeframe: tf_code = "1wk"; mtf_code = "1mo"
             elif "1h" in timeframe: tf_code = "1h"; mtf_code = "1d"
             else: tf_code = "1d"; mtf_code = "1wk"
@@ -55,7 +56,7 @@ with col_form:
         realtime_mode = st.checkbox("🔴 เปิดโหมด Real-time (ราคาขยับเองทุก 10 วิ)", value=False)
         submit_btn = st.form_submit_button("🚀 วิเคราะห์ทันที / รีเฟรชข้อมูล")
 
-# --- 4. Helper Functions (อัปเกรด Logic การแสดงผล) ---
+# --- 4. Helper Functions (อัปเกรด Logic การแสดงผล + Context Aware) ---
 def arrow_html(change):
     if change is None: return ""
     return "<span style='color:#16a34a;font-weight:600'>▲</span>" if change > 0 else "<span style='color:#dc2626;font-weight:600'>▼</span>"
@@ -94,24 +95,26 @@ def get_pe_interpretation(pe):
     if pe < 30: return "ราคาเหมาะสม (Fair)"
     return "หุ้นแพง (Growth)"
 
-# --- อัปเกรด: แบ่งระดับ ADX ละเอียด 4 ระดับ ---
-def get_adx_interpretation(adx):
-    if adx >= 50: return "Super Strong Trend (เทรนด์แรงมาก)"
-    if adx >= 25: return "Strong Trend (มีเทรนด์ชัดเจน)"
+# --- อัปเกรด: แบ่งระดับ ADX ละเอียด 4 ระดับ + Context Aware ---
+def get_adx_interpretation(adx, is_uptrend):
+    trend_str = "ขาขึ้น (Uptrend)" if is_uptrend else "ขาลง (Downtrend)"
+    
+    if adx >= 50: return f"Super Strong {trend_str} (แรงมาก)"
+    if adx >= 25: return f"Strong {trend_str} (แข็งแกร่ง)"
     if adx >= 20: return "Developing Trend (เริ่มก่อตัว)"
     return "Weak/Sideway (ตลาดไร้ทิศทาง)"
 
 def get_detailed_explanation(adx, rsi, macd_val, macd_signal, price, ema200):
+    if price > ema200: trend_dir = "ขาขึ้น (Uptrend)"
+    else: trend_dir = "ขาลง (Downtrend)"
+
     # ADX Explanation Updated
-    if adx >= 50: adx_str = "ระดับ 'รุนแรงมาก' (Super Strong)"
-    elif adx >= 25: adx_str = "ระดับ 'แข็งแกร่ง' (Strong)"
+    if adx >= 50: adx_str = f"ระดับ 'รุนแรงมาก' (Super Strong) ในทิศทาง **{trend_dir}**"
+    elif adx >= 25: adx_str = f"ระดับ 'แข็งแกร่ง' (Strong) ในทิศทาง **{trend_dir}**"
     elif adx >= 20: adx_str = "ระดับ 'กำลังก่อตัว' (Developing)"
     else: adx_str = "ระดับ 'อ่อนแอ/ไม่มีเทรนด์' (Weak)"
     
-    if price > ema200: trend_dir = "ขาขึ้น (Uptrend)"
-    else: trend_dir = "ขาลง (Downtrend)"
-        
-    adx_explain = f"ค่า **{adx:.2f}** อยู่ใน{adx_str} เมื่อรวมกับทิศทางที่เป็น **{trend_dir}** จึงสรุปได้ว่าตลาดกำลังมี **{trend_dir} ที่{adx_str.split("'")[1]}**"
+    adx_explain = f"ค่า **{adx:.2f}** บ่งบอกถึงเทรนด์ที่ {adx_str}"
 
     if rsi >= 70: rsi_explain = f"ค่า **{rsi:.2f}** สูงเกิน 70 (Overbought) ระวังแรงขายทำกำไร"
     elif rsi <= 30: rsi_explain = f"ค่า **{rsi:.2f}** ต่ำกว่า 30 (Oversold) ระวังแรงซื้อสวนกลับ"
@@ -122,7 +125,10 @@ def get_detailed_explanation(adx, rsi, macd_val, macd_signal, price, ema200):
 
     return adx_explain, rsi_explain, macd_explain
 
-def display_learning_section(rsi, rsi_interp, macd_val, macd_signal, macd_interp, adx_val, adx_interp, price, bb_upper, bb_lower):
+def display_learning_section(rsi, rsi_interp, macd_val, macd_signal, macd_interp, adx_val, price, ema200, bb_upper, bb_lower):
+    is_up = price >= ema200
+    adx_interp = get_adx_interpretation(adx_val, is_up)
+    
     st.markdown("### 📘 มุมความรู้: ค่าต่างๆ คืออะไร? มาจากไหน?")
     with st.expander("คลิกเพื่อเรียนรู้ความหมายของอินดิเคเตอร์แต่ละตัว", expanded=False):
         st.markdown(f"#### 1. MACD (Moving Average Convergence Divergence)\n* **ค่าปัจจุบัน:** `{macd_val:.3f}` -> {macd_interp}")
@@ -374,7 +380,7 @@ if submit_btn:
                 elif st_color == "red": c2.error(f"📉 {main_status}\n\n**{tf_label}**")
                 else: c2.warning(f"⚖️ {main_status}\n\n**{tf_label}**")
 
-                # --- Metrics Section (SMART SYNC FIX) ---
+                # --- Metrics Section (CONTEXT AWARE ADX - FIXED) ---
                 c3, c4, c5 = st.columns(3)
                 
                 # SVG Icons
@@ -396,30 +402,31 @@ if submit_btn:
                     else: pe_color = "gray"; pe_icon = icon_flat_svg
                     st.markdown(custom_metric_html("📊 P/E Ratio", pe_str, pe_interp, pe_color, pe_icon), unsafe_allow_html=True)
 
-                # 2. RSI (Logic Fix: Color & Icon Sync)
+                # 2. RSI
                 with c4:
                     rsi_text = get_rsi_interpretation(rsi)
-                    if rsi >= 70: 
-                        rsi_color = "red"; rsi_icon = icon_up_svg # High but risky
-                    elif rsi >= 55:
-                        rsi_color = "green"; rsi_icon = icon_up_svg
-                    elif rsi >= 45:
-                        rsi_color = "gray"; rsi_icon = icon_wave_svg
-                    elif rsi >= 30:
-                        rsi_color = "red"; rsi_icon = icon_down_svg # Bearish
-                    else:
-                        rsi_color = "red"; rsi_icon = icon_down_svg # Low/Oversold
+                    if rsi >= 70: rsi_color = "red"; rsi_icon = icon_up_svg
+                    elif rsi >= 55: rsi_color = "green"; rsi_icon = icon_up_svg
+                    elif rsi >= 45: rsi_color = "gray"; rsi_icon = icon_wave_svg
+                    elif rsi >= 30: rsi_color = "red"; rsi_icon = icon_down_svg
+                    else: rsi_color = "red"; rsi_icon = icon_down_svg
                     st.markdown(custom_metric_html("⚡ RSI (14)", f"{rsi:.2f}", rsi_text, rsi_color, rsi_icon), unsafe_allow_html=True)
 
-                # 3. ADX (Logic Fix: 4 Levels)
+                # 3. ADX (CONTEXT AWARE: Red for Downtrend, Green for Uptrend)
                 with c5:
-                    adx_text = get_adx_interpretation(adx_val)
+                    is_uptrend = price >= ema200 # ใช้ EMA 200 เป็นเกณฑ์ทิศทาง
+                    adx_text = get_adx_interpretation(adx_val, is_uptrend)
+                    
                     if adx_val >= 25:
-                        adx_color = "green"; adx_icon = icon_up_svg # Strong/Super Strong
+                        if is_uptrend:
+                            adx_color = "green"; adx_icon = icon_up_svg
+                        else:
+                            adx_color = "red"; adx_icon = icon_down_svg
                     elif adx_val >= 20:
-                        adx_color = "gray"; adx_icon = icon_wave_svg # Developing (Still gray zone)
+                        adx_color = "gray"; adx_icon = icon_wave_svg
                     else:
-                        adx_color = "gray"; adx_icon = icon_wave_svg # Weak
+                        adx_color = "gray"; adx_icon = icon_wave_svg
+                        
                     st.markdown(custom_metric_html("💪 ADX Strength", f"{adx_val:.2f}", adx_text, adx_color, adx_icon), unsafe_allow_html=True)
 
                 st.write("") 
@@ -507,9 +514,8 @@ if submit_btn:
                 st.markdown("""<div class='disclaimer-box'>⚠️ <b>หมายเหตุ:</b> ข้อมูลนี้มาจากการวิเคราะห์ทางเทคนิคด้วยระบบ AI (Hybrid Logic) เพื่อประกอบการตัดสินใจเท่านั้น <br>ผู้ใช้งานควรศึกษาก่อนการลงทุน ผู้พัฒนาไม่รับผิดชอบต่อความเสียหายใดๆ ที่เกิดขึ้นจากการนำข้อมูลนี้ไปใช้</div>""", unsafe_allow_html=True)
                 st.divider()
                 rsi_interp_str = get_rsi_interpretation(rsi)
-                adx_interp_str = get_adx_interpretation(adx_val)
-                macd_interp_str = "🟢 แรงซื้อนำ" if macd_val > macd_signal else "🔴 แรงขายนำ"
-                display_learning_section(rsi, rsi_interp_str, macd_val, macd_signal, macd_interp_str, adx_val, adx_interp_str, price, bb_upper, bb_lower)
+                # Learning Section also updated with context aware logic
+                display_learning_section(rsi, rsi_interp_str, macd_val, macd_signal, macd_interp_str, adx_val, price, ema200, bb_upper, bb_lower)
             else:
                 st.error("ไม่พบข้อมูลหุ้น หรือ ข้อมูลไม่เพียงพอสำหรับคำนวณ Indicator (ต้องมีมากกว่า 200 แท่งเทียน)")
         if not realtime_mode: break
