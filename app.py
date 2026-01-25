@@ -56,16 +56,15 @@ with col_form:
         realtime_mode = st.checkbox("🔴 เปิดโหมด Real-time (ราคาขยับเองทุก 10 วิ)", value=False)
         submit_btn = st.form_submit_button("🚀 วิเคราะห์ทันที / รีเฟรชข้อมูล")
 
-# --- 4. Helper Functions (อัปเกรด Logic การแสดงผล + Context Aware) ---
+# --- 4. Helper Functions ---
 def arrow_html(change):
     if change is None: return ""
     return "<span style='color:#16a34a;font-weight:600'>▲</span>" if change > 0 else "<span style='color:#dc2626;font-weight:600'>▼</span>"
 
 def custom_metric_html(label, value, status_text, color_status, icon_svg):
-    # กำหนดสี Hex Code ให้แม่นยำ
     if color_status == "green": color_code = "#16a34a"
     elif color_status == "red": color_code = "#dc2626"
-    else: color_code = "#a3a3a3" # สีเทาแบบสว่างนิดนึง ให้เห็นชัดบน Dark Mode
+    else: color_code = "#a3a3a3" # สีเทา
     
     html = f"""
     <div style="margin-bottom: 15px;">
@@ -95,7 +94,7 @@ def get_pe_interpretation(pe):
     if pe < 30: return "ราคาเหมาะสม (Fair)"
     return "หุ้นแพง (Growth)"
 
-# --- อัปเกรด: แบ่งระดับ ADX ละเอียด 4 ระดับ + Context Aware ---
+# --- [UPDATED] Smart ADX Interpretation (4 Levels + Direction) ---
 def get_adx_interpretation(adx, is_uptrend):
     trend_str = "ขาขึ้น (Uptrend)" if is_uptrend else "ขาลง (Downtrend)"
     
@@ -107,8 +106,7 @@ def get_adx_interpretation(adx, is_uptrend):
 def get_detailed_explanation(adx, rsi, macd_val, macd_signal, price, ema200):
     if price > ema200: trend_dir = "ขาขึ้น (Uptrend)"
     else: trend_dir = "ขาลง (Downtrend)"
-
-    # ADX Explanation Updated
+        
     if adx >= 50: adx_str = f"ระดับ 'รุนแรงมาก' (Super Strong) ในทิศทาง **{trend_dir}**"
     elif adx >= 25: adx_str = f"ระดับ 'แข็งแกร่ง' (Strong) ในทิศทาง **{trend_dir}**"
     elif adx >= 20: adx_str = "ระดับ 'กำลังก่อตัว' (Developing)"
@@ -139,7 +137,7 @@ def display_learning_section(rsi, rsi_interp, macd_val, macd_signal, macd_interp
         st.divider()
         st.markdown(f"#### 4. Bollinger Bands (BB)\n* **Upper:** `{bb_upper:.2f}` | **Lower:** `{bb_lower:.2f}`")
 
-# --- 5. Data Fetching (Hybrid) ---
+# --- 5. Data Fetching (คงเดิม) ---
 @st.cache_data(ttl=10, show_spinner=False)
 def get_data_hybrid(symbol, interval, mtf_interval):
     try:
@@ -174,7 +172,7 @@ def get_data_hybrid(symbol, interval, mtf_interval):
     except:
         return None, None, None, None
 
-# --- 6. Analysis Logic (Sniper Logic) ---
+# --- 6. Analysis Logic (คงเดิม) ---
 def analyze_volume(row, vol_ma):
     vol = row['Volume']
     if vol > vol_ma * 1.5: return "High Volume", "green"
@@ -194,7 +192,7 @@ def analyze_news_sentiment(news_list):
             if w in title: score -= 1
     return score
 
-# --- 7. AI Decision Engine (Hybrid) ---
+# --- 7. AI Decision Engine (คงเดิม) ---
 def ai_hybrid_analysis(price, ema20, ema50, ema200, rsi, macd_val, macd_sig, adx, bb_up, bb_low, 
                        vol_status, mtf_trend, news_score, atr_val):
     score = 0
@@ -380,7 +378,7 @@ if submit_btn:
                 elif st_color == "red": c2.error(f"📉 {main_status}\n\n**{tf_label}**")
                 else: c2.warning(f"⚖️ {main_status}\n\n**{tf_label}**")
 
-                # --- Metrics Section (CONTEXT AWARE ADX - FIXED) ---
+                # --- Metrics Section (SMART ADX - 4 Levels & Direction) ---
                 c3, c4, c5 = st.columns(3)
                 
                 # SVG Icons
@@ -412,19 +410,19 @@ if submit_btn:
                     else: rsi_color = "red"; rsi_icon = icon_down_svg
                     st.markdown(custom_metric_html("⚡ RSI (14)", f"{rsi:.2f}", rsi_text, rsi_color, rsi_icon), unsafe_allow_html=True)
 
-                # 3. ADX (CONTEXT AWARE: Red for Downtrend, Green for Uptrend)
+                # 3. ADX (SMART & CONTEXT AWARE)
                 with c5:
                     is_uptrend = price >= ema200 # ใช้ EMA 200 เป็นเกณฑ์ทิศทาง
                     adx_text = get_adx_interpretation(adx_val, is_uptrend)
                     
-                    if adx_val >= 25:
+                    if adx_val >= 25: # Strong Zone
                         if is_uptrend:
                             adx_color = "green"; adx_icon = icon_up_svg
                         else:
                             adx_color = "red"; adx_icon = icon_down_svg
-                    elif adx_val >= 20:
+                    elif adx_val >= 20: # Developing Zone
                         adx_color = "gray"; adx_icon = icon_wave_svg
-                    else:
+                    else: # Weak Zone
                         adx_color = "gray"; adx_icon = icon_wave_svg
                         
                     st.markdown(custom_metric_html("💪 ADX Strength", f"{adx_val:.2f}", adx_text, adx_color, adx_icon), unsafe_allow_html=True)
@@ -514,7 +512,6 @@ if submit_btn:
                 st.markdown("""<div class='disclaimer-box'>⚠️ <b>หมายเหตุ:</b> ข้อมูลนี้มาจากการวิเคราะห์ทางเทคนิคด้วยระบบ AI (Hybrid Logic) เพื่อประกอบการตัดสินใจเท่านั้น <br>ผู้ใช้งานควรศึกษาก่อนการลงทุน ผู้พัฒนาไม่รับผิดชอบต่อความเสียหายใดๆ ที่เกิดขึ้นจากการนำข้อมูลนี้ไปใช้</div>""", unsafe_allow_html=True)
                 st.divider()
                 rsi_interp_str = get_rsi_interpretation(rsi)
-                # Learning Section also updated with context aware logic
                 display_learning_section(rsi, rsi_interp_str, macd_val, macd_signal, macd_interp_str, adx_val, price, ema200, bb_upper, bb_lower)
             else:
                 st.error("ไม่พบข้อมูลหุ้น หรือ ข้อมูลไม่เพียงพอสำหรับคำนวณ Indicator (ต้องมีมากกว่า 200 แท่งเทียน)")
