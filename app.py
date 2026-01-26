@@ -168,6 +168,19 @@ def filter_levels(levels, threshold_pct=0.015):
     selected = []
     for val, label in levels:
         if np.isnan(val): continue
+        # --- แปลภาษาและย่อคำตรงนี้ ---
+        label = label.replace("BB Lower (Volatility)", "BB Lower (ความผันผวน)")
+        label = label.replace("Low 60 Days (Price Action)", "Low 60 วัน (ฐานราคา)")
+        label = label.replace("EMA 200 (Trend Wall)", "EMA 200 (เทรนด์หลัก)")
+        label = label.replace("EMA 50 (Short Trend)", "EMA 50 (ระยะกลาง)")
+        label = label.replace("EMA 20 (Momentum)", "EMA 20 (โมเมนตัม)")
+        label = label.replace("BB Upper (Ceiling)", "BB Upper (เพดานราคา)")
+        label = label.replace("High 60 Days (Peak)", "High 60 วัน (ยอดดอย)")
+        
+        # Format MTF
+        if "MTF" in label or "1wk" in label.lower() or "1mo" in label.lower():
+             label = "EMA 200 (TF ใหญ่)"
+
         if not selected: selected.append((val, label))
         else:
             last_val = selected[-1][0]
@@ -175,23 +188,22 @@ def filter_levels(levels, threshold_pct=0.015):
             if diff > threshold_pct: selected.append((val, label))
     return selected
 
-# --- 5. Data Fetching (Smart Logic) ---
+# --- 5. Data Fetching (Smart Logic - NO News) ---
 @st.cache_data(ttl=10, show_spinner=False)
 def get_data_hybrid(symbol, interval, mtf_interval):
     try:
         ticker = yf.Ticker(symbol)
         
-        # ✅ SMART SELECTION: เลือกช่วงเวลาตามความเหมาะสมของแต่ละ Timeframe
+        # Smart Period Selection
         if interval == "1wk":
-            period_val = "10y"  # Week: 10 ปี (ได้ ~520 แท่ง) เหมาะสุดสำหรับ EMA 200
+            period_val = "10y"  # Week: 10 ปี
         elif interval == "1d":
-            period_val = "5y"   # Day: 5 ปี (ได้ ~1,250 แท่ง) เหลือเฟือและไม่หนักเครื่อง
+            period_val = "5y"   # Day: 5 ปี
         else: # 1h
-            period_val = "730d" # Hour: 2 ปี (Max ของ Yahoo)
+            period_val = "730d" # Hour: 2 ปี
 
         df = ticker.history(period=period_val, interval=interval)
-        df_mtf = ticker.history(period="10y", interval=mtf_interval) # MTF ดึง 10 ปีเสมอ เพื่อให้ EMA 200 Week คำนวณได้ชัวร์
-        news = ticker.news
+        df_mtf = ticker.history(period="10y", interval=mtf_interval) # MTF ดึง 10 ปีเสมอ
         
         stock_info = {
             'longName': ticker.info.get('longName', symbol),
@@ -215,9 +227,9 @@ def get_data_hybrid(symbol, interval, mtf_interval):
              stock_info['regularMarketPrice'] = df['Close'].iloc[-1]
              stock_info['regularMarketChange'] = df['Close'].iloc[-1] - df['Close'].iloc[-2]
              stock_info['regularMarketChangePercent'] = (stock_info['regularMarketChange'] / df['Close'].iloc[-2])
-        return df, stock_info, df_mtf, news
+        return df, stock_info, df_mtf
     except:
-        return None, None, None, None
+        return None, None, None
 
 # --- 6. Analysis Logic ---
 def analyze_volume(row, vol_ma):
@@ -227,43 +239,30 @@ def analyze_volume(row, vol_ma):
     elif vol < vol_ma * 0.7: return "Low Volume", "red"
     else: return "Normal Volume", "gray"
 
-def analyze_news_sentiment(news_list):
-    if not news_list: return "No News", 0
-    score = 0
-    bullish_keywords = ['soar', 'jump', 'surge', 'beat', 'profit', 'growth', 'buy', 'strong', 'record', 'up']
-    bearish_keywords = ['drop', 'fall', 'plunge', 'miss', 'loss', 'down', 'sell', 'weak', 'crash', 'risk']
-    for item in news_list[:5]:
-        title = item.get('title', '').lower()
-        for w in bullish_keywords: 
-            if w in title: score += 1
-        for w in bearish_keywords: 
-            if w in title: score -= 1
-    return score
-
-# --- 7. AI Decision Engine (Master Logic) ---
+# --- 7. AI Decision Engine (Master Logic - NO News - UPDATED UI TEXT) ---
 def ai_hybrid_analysis(price, ema20, ema50, ema200, rsi, macd_val, macd_sig, adx, bb_up, bb_low, 
-                       vol_status, mtf_trend, news_score, atr_val, mtf_ema200_val):
+                       vol_status, mtf_trend, atr_val, mtf_ema200_val):
     score = 0
     bullish_factors = [] 
     bearish_factors = []
     
-    # 1. Trend Analysis
+    # 1. Trend Analysis (Updated Text)
     if not np.isnan(ema200):
         if price > ema200:
             score += 3
-            bullish_factors.append("ราคาอยู่เหนือเส้น EMA 200 (เทรนด์หลักขาขึ้น)")
+            bullish_factors.append("ราคา (Day) อยู่เหนือเส้น EMA 200 (เทรนด์หลักขาขึ้น)")
             if not np.isnan(ema20) and price > ema20:
                 score += 1
-                bullish_factors.append("ราคายืนเหนือ EMA 20 (ระยะสั้นแข็งแกร่ง)")
+                bullish_factors.append("ราคา (Day) ยืนเหนือ EMA 20 (ระยะสั้นแข็งแกร่ง)")
             elif not np.isnan(ema20):
-                bearish_factors.append("ระยะสั้นหลุด EMA 20 (มีการพักตัวในขาขึ้น)")
+                bearish_factors.append("ราคา (Day) หลุด EMA 20 (มีการพักตัวในขาขึ้น)")
         else:
             score -= 3
-            bearish_factors.append("ราคาอยู่ใต้เส้น EMA 200 (เทรนด์หลักขาลง)")
+            bearish_factors.append("ราคา (Day) อยู่ใต้เส้น EMA 200 (เทรนด์หลักขาลง)")
             if not np.isnan(ema20) and price < ema20:
-                bearish_factors.append("ราคาอยู่ใต้ EMA 20 (แรงขายระยะสั้นยังกดดัน)")
+                bearish_factors.append("ราคา (Day) อยู่ใต้ EMA 20 (แรงขายระยะสั้นยังกดดัน)")
             elif not np.isnan(ema20):
-                bullish_factors.append("ราคาดีดกลับมายืนเหนือ EMA 20 ได้ (ลุ้น Rebound)")
+                bullish_factors.append("ราคา (Day) ดีดกลับมายืนเหนือ EMA 20 ได้ (ลุ้น Rebound)")
     else:
         bullish_factors.append("ข้อมูลกราฟไม่เพียงพอสำหรับ EMA 200")
 
@@ -276,7 +275,7 @@ def ai_hybrid_analysis(price, ema20, ema50, ema200, rsi, macd_val, macd_sig, adx
             score -= 1
             bearish_factors.append("MACD ตัดลง (โมเมนตัมลบ/แรงส่งแผ่ว)")
 
-    # 3. MTF Logic (Fix: Use EMA 200 for Long Term Trend)
+    # 3. MTF Logic (Fix: Use EMA 200)
     mtf_label = "Week" if mtf_trend != "Unknown" else "MTF"
     if mtf_trend == "Bullish":
         score += 2
@@ -322,7 +321,7 @@ def ai_hybrid_analysis(price, ema20, ema50, ema200, rsi, macd_val, macd_sig, adx
         banner_title = "🚀 Super Nova: กระทิงดุขั้นสุด"
         strategy_text = "Aggressive Buy / Let Profit Run"
         context_text = "ตลาดเข้าสู่สภาวะ 'Euphoria' (ตื่นตัวสุดขีด) ทุก Timeframe เป็นขาขึ้น วอลุ่มซื้อถล่มทลาย ไม่มีแนวต้านขวางกั้น"
-        holder_advice = f"🎉 **Jackpot:** กอดหุ้นไว้ให้แน่นที่สุด! อย่าเพิ่งรีบขายหมู ใช้ Trailing Stop (โซน {sl_str}) เกาะไปเรื่อยๆ จนกว่าเทรนด์จะหักหัวลง"
+        holder_advice = f"🎉 **Jackpot:** กอดหุ้นไว้ให้แน่นที่สุด! อย่าเพิ่งรีบขายหมู ใช้ Trailing Stop (โซน {sl_str}) เกาะเทรนด์ไปเรื่อยๆ จนกว่าเทรนด์จะหักหัวลง"
 
     elif score >= 4:
         status_color = "green"
@@ -365,7 +364,7 @@ def ai_hybrid_analysis(price, ema20, ema50, ema200, rsi, macd_val, macd_sig, adx
         banner_title = "🐻 Strong Bearish: ขาลงเต็มตัว"
         strategy_text = "Strong Sell / Avoid (ขายทิ้ง/ห้ามยุ่ง)"
         context_text = "โครงสร้างราคาเสียหาย หลุดแนวรับสำคัญ เทรนด์หลักเปลี่ยนทิศเป็นขาลง แรงขายครองตลาดอย่างสมบูรณ์"
-        holder_advice = f"🥶 **Cut Loss Now:** อย่าเสียดาย! การรักษาเงินต้นสำคัญที่สุด ต้องยอมมอบตัวตอนนี้ก่อนที่จะเสียหายหนักกว่าเดิม ห้ามถัวเฉลี่ยขาลงเด็ดขาด จนกว่าจะยืน EMA 20 ({e20_str}) ได้"
+        holder_advice = f"🥶 **Cut Loss Now:** อย่าเสียดาย! ต้องยอมมอบตัวก่อนที่จะเสียหายหนักกว่าเดิม ห้ามถัวเฉลี่ยขาลงเด็ดขาด จนกว่าจะยืน EMA 20 ({e20_str}) ได้"
 
     else:
         status_color = "red"
@@ -392,7 +391,7 @@ if submit_btn:
     st.markdown("""<style>body { overflow: auto !important; }</style>""", unsafe_allow_html=True)
     
     with st.spinner(f"AI กำลังประมวลผล {symbol_input} แบบ Hybrid Full Loop..."):
-        df, info, df_mtf, news = get_data_hybrid(symbol_input, tf_code, mtf_code)
+        df, info, df_mtf = get_data_hybrid(symbol_input, tf_code, mtf_code)
 
     if df is not None and not df.empty and len(df) > 10: 
         # Calculations
@@ -449,9 +448,9 @@ if submit_btn:
                 if df_mtf['Close'].iloc[-1] > mtf_ema200_val: mtf_trend = "Bullish"
                 else: mtf_trend = "Bearish"
         
-        news_score = analyze_news_sentiment(news)
+        # ❌ เอา Sentiment ออกแล้ว
         ai_report = ai_hybrid_analysis(price, ema20, ema50, ema200, rsi, macd_val, macd_signal, adx_val, bb_upper, bb_lower, 
-                                        vol_status, mtf_trend, news_score, atr, mtf_ema200_val)
+                                        vol_status, mtf_trend, atr, mtf_ema200_val)
 
         # --- DISPLAY ---
         logo_url = f"https://financialmodelingprep.com/image-stock/{symbol_input}.png"
@@ -580,7 +579,8 @@ if submit_btn:
             </div>
             """, unsafe_allow_html=True)
             
-            st.subheader("🚧 Key Levels (Smart Filter)")
+            # --- Key Levels UI Modified ---
+            st.subheader("🚧 Key Levels (นัยสำคัญ)")
             low_60d = df['Low'].tail(60).min()
             high_60d = df['High'].tail(60).max()
             mtf_label_str = f"EMA 200 ({mtf_code.upper()})" if mtf_ema200_val > 0 else "MTF EMA 200 (N/A)"
@@ -607,15 +607,15 @@ if submit_btn:
             raw_resistances = sorted([x for x in potential_resistances if not np.isnan(x[0]) and x[0] > price and x[0] > 0], key=lambda x: x[0])
             valid_resistances = filter_levels(raw_resistances, threshold_pct=0.015)
             
-            st.markdown("#### 🟢 แนวรับ (Strategic Supports)")
+            st.markdown("#### 🟢 แนวรับ (Support)")
             if valid_supports:
                 for v, d in valid_supports[:3]: st.write(f"- **{v:.2f}** : {d}")
-            else: st.write("- ราคาทำ All Time High / ไม่มีแนวรับใกล้เคียง")
+            else: st.write("- ราคาทำ All Time High")
             
-            st.markdown("#### 🔴 แนวต้าน (Resistances)")
+            st.markdown("#### 🔴 แนวต้าน (Resistance)")
             if valid_resistances:
-                for v, d in valid_resistances[:3]: st.write(f"- **{v:.2f}** : {d}")
-            else: st.write("- ราคาทำ All Time Low / ไม่มีแนวต้านใกล้เคียง")
+                for v, d in valid_resistances[:2]: st.write(f"- **{v:.2f}** : {d}")
+            else: st.write("- ราคาทำ All Time Low")
 
         with c_ai:
             exp_adx, exp_rsi, exp_macd, exp_trend = get_detailed_explanation(adx_val, rsi, macd_val, macd_signal, price, ema200)
@@ -624,8 +624,6 @@ if submit_btn:
             with st.container():
                 st.info(f"{exp_adx}")
                 st.info(f"{exp_macd}")
-                sent_icon = "😊" if news_score > 0 else "😡" if news_score < 0 else "😐"
-                st.info(f"📰 **Sentiment:** {sent_icon} Score: {news_score} (ประเมินจากพาดหัวข่าว {len(news)} ข่าวล่าสุด)")
 
             # ✅ UPDATE: ส่วนแสดงผล Highlight Box
             st.subheader("🤖 AI STRATEGY (บทสรุป)")
