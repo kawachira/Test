@@ -4,65 +4,12 @@ import pandas as pd
 import pandas_ta as ta
 import numpy as np
 import time
-import uuid
 from datetime import datetime
 
 # --- 1. ตั้งค่าหน้าเว็บ ---
 st.set_page_config(page_title="AI Stock Master", page_icon="💎", layout="wide")
 
-# ==========================================
-# 🔐 ส่วนระบบจัดการผู้ใช้งาน & นับจำนวน (Code 4)
-# ==========================================
-
-# 1. กำหนดรหัสผ่าน
-PASSWORD = "money123" 
-MAX_USERS = 50  # จำกัดจำนวนคนใช้งานพร้อมกัน
-
-# 2. ฟังก์ชันนับจำนวนคน
-@st.cache_resource
-def get_session_data():
-    return {"users": set()}
-
-def update_user_count():
-    if 'user_id' not in st.session_state:
-        st.session_state.user_id = str(uuid.uuid4())
-    
-    session_data = get_session_data()
-    session_data["users"].add(st.session_state.user_id)
-    return len(session_data["users"])
-
-# 3. ฟังก์ชันตรวจสอบรหัสผ่าน
-def check_password():
-    if "password_correct" not in st.session_state:
-        st.session_state.password_correct = False
-
-    if not st.session_state.password_correct:
-        st.markdown("""
-        <style>
-        .stTextInput input { text-align: center; font-size: 20px; }
-        </style>
-        <h1 style='text-align: center;'>🔒 กรุณาใส่รหัสผ่านเพื่อเข้าใช้งาน</h1>
-        """, unsafe_allow_html=True)
-        
-        col1, col2, col3 = st.columns([1,2,1])
-        with col2:
-            pwd = st.text_input("Password", type="password", label_visibility="collapsed")
-            if pwd:
-                if pwd == PASSWORD:
-                    st.session_state.password_correct = True
-                    st.rerun()
-                else:
-                    st.error("❌ รหัสผ่านไม่ถูกต้อง")
-        return False
-    return True
-
-# --- เริ่มการตรวจสอบสิทธิ์ ---
-if not check_password():
-    st.stop()
-
-current_users = update_user_count()
-
-# --- CSS ปรับแต่ง ---
+# --- 2. CSS ปรับแต่ง ---
 st.markdown("""
     <style>
     body { overflow-x: hidden; }
@@ -84,25 +31,8 @@ st.markdown("""
         text-align: center; font-weight: 500;
         box-shadow: 0 4px 6px rgba(0,0,0,0.05);
     }
-    .user-counter {
-        position: fixed; bottom: 10px; right: 10px;
-        background: rgba(0,0,0,0.7); color: white;
-        padding: 5px 15px; border-radius: 20px; font-size: 0.8rem;
-        z-index: 9999;
-    }
     </style>
     """, unsafe_allow_html=True)
-
-# แสดงจำนวนคนมุมขวาล่าง
-st.markdown(f"""
-<div class='user-counter'>
-    👤 Active Users: {current_users} / {MAX_USERS}
-</div>
-""", unsafe_allow_html=True)
-
-if current_users > MAX_USERS:
-    st.error(f"⛔ ขออภัย! ขณะนี้มีผู้ใช้งานเต็มจำนวน ({MAX_USERS} คน) กรุณาลองใหม่ภายหลัง")
-    st.stop()
 
 # --- 3. ส่วนหัวข้อ ---
 st.markdown("<h1>💎 Ai<br><span style='font-size: 1.5rem; opacity: 0.7;'>ระบบวิเคราะห์หุ้นอัจฉริยะ (Hybrid Sniper)</span></h1>", unsafe_allow_html=True)
@@ -175,36 +105,28 @@ def get_adx_interpretation(adx, is_uptrend):
     if adx >= 20: return "Developing Trend (เริ่มก่อตัว)"
     return "Weak/Sideway (ตลาดไร้ทิศทาง)"
 
-# ✅ UPDATE: ฟังก์ชันนี้ได้รับการแก้ไขให้เชื่อมโยง Logic ไม่ให้ขัดแย้งกัน
 def get_detailed_explanation(adx, rsi, macd_val, macd_signal, price, ema200):
-    # 1. วิเคราะห์เทรนด์หลัก (EMA 200)
     is_uptrend = price > ema200
-    
-    # 2. วิเคราะห์โมเมนตัมระยะสั้น (MACD)
     is_bullish_momentum = macd_val > macd_signal
     
-    # 3. สร้างบริบท (Context) ที่เชื่อมโยงกัน
     if is_uptrend and is_bullish_momentum:
         trend_context = "ขาขึ้นเต็มตัว (Uptrend) และมีแรงส่งที่ดี"
     elif is_uptrend and not is_bullish_momentum:
         trend_context = "ขาขึ้น (Uptrend) แต่ระยะสั้นกำลังพักตัว/ย่อตัว (Correction)"
     elif not is_uptrend and not is_bullish_momentum:
         trend_context = "ขาลงเต็มตัว (Downtrend) แรงขายยังกดดันต่อเนื่อง"
-    else: # not is_uptrend and is_bullish_momentum
+    else: 
         trend_context = "ขาลง (Downtrend) แต่เริ่มมีการดีดกลับระยะสั้น (Rebound)"
         
-    # 4. อธิบาย ADX ตามบริบทที่สรุปมาแล้ว
     if adx >= 50: adx_explain = f"🔥 **ความแรงเทรนด์:** รุนแรงมาก! ตลาดกำลังอยู่ในสภาวะ '{trend_context}' อย่างหนักหน่วง"
     elif adx >= 25: adx_explain = f"💪 **ความแรงเทรนด์:** แข็งแกร่ง! ทิศทางชัดเจนว่าเป็น '{trend_context}' ไม่ใช่การแกว่งมั่วๆ"
     elif adx >= 20: adx_explain = f"🌱 **ความแรงเทรนด์:** กำลังก่อตัว... เริ่มเห็นทรงว่าเป็น '{trend_context}'"
     else: adx_explain = f"😴 **ความแรงเทรนด์:** ตลาดไร้ทิศทาง (Sideway) แรงซื้อขายยังไม่เลือกทางชัดเจน"
 
-    # 5. อธิบาย RSI
     if rsi >= 70: rsi_explain = "⚠️ **RSI (Overbought):** ราคาขึ้นมาสูงจน 'ตึงมือ' ระวังคนเทขายใส่"
     elif rsi <= 30: rsi_explain = "💎 **RSI (Oversold):** ราคาลงมาลึกจน 'เริ่มถูก' อาจมีเด้งสั้นๆ"
     else: rsi_explain = "⚖️ **RSI (Neutral):** ราคาสมเหตุสมผล ซื้อขายกันตามปกติ"
 
-    # 6. อธิบาย MACD
     if is_bullish_momentum: 
         macd_explain = "🟢 **MACD:** แรงซื้อกลับมานำตลาด (โมเมนตัมบวก)"
     else: 
@@ -295,58 +217,97 @@ def analyze_news_sentiment(news_list):
             if w in title: score -= 1
     return score
 
-# --- 7. AI Decision Engine ---
+# --- 7. AI Decision Engine (Logic 2.0: Human-like Thinking) ---
 def ai_hybrid_analysis(price, ema20, ema50, ema200, rsi, macd_val, macd_sig, adx, bb_up, bb_low, 
                        vol_status, mtf_trend, news_score, atr_val):
     score = 0
-    reasons = []
-    warnings = []
     
-    # Trend (40%)
+    # ✅ FIX: แยกถังเก็บข้อมูลชัดเจน ไม่รวมกันมั่ว
+    bullish_factors = [] # ปัจจัยสนับสนุนขาขึ้น
+    bearish_factors = [] # ปัจจัยกดดัน/ความเสี่ยง
+    
+    # 1. Trend Analysis (EMA Structure)
     if price > ema200:
-        if price > ema20: score += 3; reasons.append("ราคายืนเหนือ EMA ระยะสั้นและยาว (ขาขึ้น)")
-        else: score += 1; reasons.append("เทรนด์หลักขาขึ้น แต่ระยะสั้นย่อตัว")
+        score += 3
+        bullish_factors.append("ราคาอยู่เหนือเส้น EMA 200 (เทรนด์หลักขาขึ้น)")
+        if price > ema20:
+            score += 1
+            bullish_factors.append("ราคายืนเหนือ EMA 20 (ระยะสั้นแข็งแกร่ง)")
+        else:
+            bearish_factors.append("ระยะสั้นหลุด EMA 20 (มีการพักตัวในขาขึ้น)")
     else:
-        score -= 3; reasons.append("ราคาอยู่ใต้ EMA 200 (เทรนด์หลักขาลง)")
-        
-    # MTF (20%)
-    if mtf_trend == "Bullish": score += 2; reasons.append("Timeframe ใหญ่ (วีค/เดือน) เป็นขาขึ้นสนับสนุน")
-    elif mtf_trend == "Bearish": score -= 2; warnings.append("Timeframe ใหญ่ (วีค/เดือน) ยังเป็นขาลงกดดันอยู่")
-    
-    # Momentum (20%)
-    if macd_val > macd_sig: score += 1
-    if "High Volume" in vol_status: score += 1 if price > ema20 else -1
-    
-    # Sentiment
-    if news_score > 0: score += 1
-    elif news_score < 0: score -= 1
+        score -= 3
+        bearish_factors.append("ราคาอยู่ใต้เส้น EMA 200 (เทรนด์หลักขาลง)")
+        if price < ema20:
+            bearish_factors.append("ราคาอยู่ใต้ EMA 20 (แรงขายระยะสั้นยังกดดัน)")
+        else:
+            bullish_factors.append("ราคาดีดกลับมายืนเหนือ EMA 20 ได้ (ลุ้น Rebound)")
 
-    # Strategy
+    # 2. Momentum (MACD)
+    if macd_val > macd_sig:
+        score += 1
+        bullish_factors.append("MACD ตัดขึ้น (โมเมนตัมบวก)")
+    else:
+        score -= 1
+        bearish_factors.append("MACD ตัดลง (โมเมนตัมลบ/แรงส่งแผ่ว)")
+
+    # 3. Timeframe Context (MTF)
+    if mtf_trend == "Bullish":
+        score += 2
+        bullish_factors.append("Timeframe ใหญ่ (Week/Month) เป็นขาขึ้นช่วยหนุน")
+    elif mtf_trend == "Bearish":
+        score -= 2
+        bearish_factors.append("Timeframe ใหญ่ (Week/Month) ยังเป็นขาลงกดดันภาพรวม")
+
+    # 4. Volume Analysis
+    if "High Volume" in vol_status:
+        if price > ema20: 
+            score += 1
+            bullish_factors.append("มีวอลุ่มซื้อเข้ามาสนับสนุนอย่างหนาแน่น")
+        else:
+            score -= 1
+            bearish_factors.append("มีวอลุ่มเทขายออกมาอย่างหนาแน่น")
+    elif "Low Volume" in vol_status:
+        bearish_factors.append("วอลุ่มเบาบาง (ตลาดขาดความสนใจ)")
+
+    # 5. RSI Context (Overbought/Oversold)
+    if rsi > 70:
+        bearish_factors.append(f"RSI สูงระดับ {rsi:.0f} (Overbought) ระวังแรงเทขายทำกำไร")
+    elif rsi < 30:
+        bullish_factors.append(f"RSI ต่ำระดับ {rsi:.0f} (Oversold) ราคาเริ่มถูก อาจมีเด้งสั้น")
+
+    # --- Strategy Generator (Dynamic Context) ---
     status_color = "yellow"
     banner_title = "Sideway: รอเลือกทาง"
     strategy_text = "Wait & See (รอดูไปก่อน)"
-    context = "ตลาดยังไม่เลือกทางชัดเจน พักตัวออกข้าง"
-    
+    context_text = ""
+
+    # สร้างคำอธิบายแบบมนุษย์ (Dynamic Logic Combinations)
     if score >= 5:
         status_color = "green"
         banner_title = "🚀 Super Bullish: ขาขึ้นสมบูรณ์แบบ"
         strategy_text = "Strong Buy / Let Profit Run (ถือต่อ/ซื้อเพิ่ม)"
-        context = "ทุกปัจจัย (เทรนด์, ภาพใหญ่, วอลุ่ม) สนับสนุนขาขึ้นเต็มที่"
+        context_text = "ตลาดอยู่ในสภาวะ 'กระทิงดุ' (Strong Uptrend) ทั้งเทรนด์หลักและระยะสั้นไปในทิศทางเดียวกัน วอลุ่มและภาพใหญ่สนับสนุนเต็มที่ เป็นจังหวะที่ได้เปรียบมาก"
     elif score >= 2:
         status_color = "green"
         banner_title = "Bullish: แนวโน้มขาขึ้น"
-        strategy_text = "Buy on Dip (รอย่อแล้วซื้อ)"
-        context = "เทรนด์หลักดี แต่อาจมีการพักตัวระยะสั้น หาจังหวะย่อซื้อได้เปรียบ"
+        strategy_text = "Buy on Dip (ย่อซื้อสะสม)"
+        context_text = "ภาพรวมยังเป็นขาขึ้นที่ดี แต่อาจมีแรงขายทำกำไรระยะสั้นหรือการพักตัวบ้าง ไม่ใช่เรื่องน่ากังวล ให้หาจังหวะที่ราคาย่อตัวลงมาที่แนวรับเพื่อเข้าซื้อ"
     elif score <= -4:
         status_color = "red"
         banner_title = "Bearish: ขาลงเต็มตัว"
         strategy_text = "Strong Sell / Avoid (ขายทิ้ง/ห้ามยุ่ง)"
-        context = "โครงสร้างราคาเสียและ Timeframe ใหญ่กดดัน อย่าเพิ่งรับมีด"
+        context_text = "ตลาดอยู่ในสภาวะ 'หมี' (Downtrend) อย่างสมบูรณ์ แรงขายครองตลาด โครงสร้างราคาเสียหายหนัก การเข้าซื้อตอนนี้เปรียบเสมือนการ 'รับมีด' มีความเสี่ยงสูงมาก"
     elif score <= -1:
         status_color = "orange"
         banner_title = "Correction/Weak: เริ่มอ่อนแอ"
-        strategy_text = "Defensive (ระวังตัว/แบ่งขาย)"
-        context = "แรงส่งเริ่มหมด ระวังการปรับฐานหรือลงต่อ"
+        strategy_text = "Defensive (ระวังตัว/เด้งขาย)"
+        context_text = "โมเมนตัมเริ่มอ่อนแรงลงอย่างเห็นได้ชัด หรือติดแนวต้านสำคัญ ภาพรวมเริ่มดูไม่ดี ควรเน้นการตั้งรับ หรือหาจังหวะที่ราคาดีดตัวขึ้นเพื่อระบายของออก (Sell on Rally)"
+    else: # Score around 0
+        status_color = "yellow"
+        banner_title = "Sideway: ไร้ทิศทาง"
+        strategy_text = "Wait & See (ทับมือ/เล่นสั้นกรอบแคบ)"
+        context_text = "แรงซื้อและแรงขายยังสู้กันอยู่ ไม่มีฝ่ายไหนชนะขาด ราคาแกว่งตัวออกข้าง (Sideway) ควรรอให้ราคาเลือกทางที่ชัดเจน (Breakout) ก่อนค่อยตัดสินใจ"
 
     sl = price - (2 * atr_val)
     tp = price + (3 * atr_val)
@@ -355,9 +316,9 @@ def ai_hybrid_analysis(price, ema20, ema50, ema200, rsi, macd_val, macd_sig, adx
         "status_color": status_color,
         "banner_title": banner_title,
         "strategy": strategy_text,
-        "context": context,
-        "reasons": reasons,
-        "warnings": warnings,
+        "context": context_text,
+        "bullish_factors": bullish_factors, # ส่งค่าที่แยกถังแล้วออกไป
+        "bearish_factors": bearish_factors, # ส่งค่าที่แยกถังแล้วออกไป
         "sl": sl,
         "tp": tp
     }
@@ -371,7 +332,7 @@ if submit_btn:
         df, info, df_mtf, news = get_data_hybrid(symbol_input, tf_code, mtf_code)
 
     if df is not None and not df.empty and len(df) > 200:
-        # Calculations
+        # Calculations (เหมือนเดิม)
         df['EMA20'] = ta.ema(df['Close'], length=20)
         df['EMA50'] = ta.ema(df['Close'], length=50)
         df['EMA200'] = ta.ema(df['Close'], length=200)
@@ -597,12 +558,16 @@ if submit_btn:
             with st.chat_message("assistant"):
                 st.markdown(f"### 🎯 {ai_report['strategy']}")
                 st.write(f"**ภาพรวม:** {ai_report['context']}")
-                if ai_report['reasons']:
-                    st.markdown("**✅ ข้อดี (Pros):**")
-                    for r in ai_report['reasons']: st.write(f"- {r}")
-                if ai_report['warnings']:
-                    st.markdown("**⚠️ ข้อควรระวัง (Cons):**")
-                    for w in ai_report['warnings']: st.write(f"- {w}")
+                
+                # ✅ UPDATE: เปลี่ยนชื่อหัวข้อให้ชัดเจน และแสดงผลถูกต้องตาม Logic ใหม่
+                if ai_report['bullish_factors']:
+                    st.markdown("**🟢 ปัจจัยสนับสนุนขาขึ้น (Bullish Drivers):**")
+                    for r in ai_report['bullish_factors']: st.write(f"- {r}")
+                
+                if ai_report['bearish_factors']:
+                    st.markdown("**🔴 ความเสี่ยงที่ต้องระวัง (Bearish Risks):**")
+                    for w in ai_report['bearish_factors']: st.write(f"- {w}")
+                    
                 st.markdown("---")
                 st.markdown(f"**🛡️ แผนควบคุมความเสี่ยง (Risk Management):**")
                 st.write(f"🛑 **ตัดขาดทุน (Stop Loss):** {ai_report['sl']:.2f}")
