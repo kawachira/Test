@@ -164,17 +164,17 @@ def display_learning_section(rsi, rsi_interp, macd_val, macd_signal, macd_interp
         st.markdown(f"#### 4. Bollinger Bands (BB)\n* **Upper:** `{bb_upper:.2f}` | **Lower:** `{bb_lower:.2f}`")
         st.markdown("* **คืออะไร?:** กรอบการแกว่งตัวของราคาเปรียบเหมือนขอบถนน ถ้าราคาทะลุออกไปมักจะเด้งกลับเข้ามา")
 
-def filter_levels(levels, threshold_pct=0.015):
+def filter_levels(levels, threshold_pct=0.025): # ✅ ปรับระยะห่างเป็น 2.5% เพื่อให้แนวต้านไม่ชิดกันเกินไป
     selected = []
     for val, label in levels:
         if np.isnan(val): continue
         # --- แปลภาษาและย่อคำตรงนี้ ---
-        label = label.replace("BB Lower (Volatility)", "BB Lower (ความผันผวน)")
+        label = label.replace("BB Lower (Volatility)", "BB Lower (กรอบล่าง)")
         label = label.replace("Low 60 Days (Price Action)", "Low 60 วัน (ฐานราคา)")
         label = label.replace("EMA 200 (Trend Wall)", "EMA 200 (เทรนด์หลัก)")
         label = label.replace("EMA 50 (Short Trend)", "EMA 50 (ระยะกลาง)")
         label = label.replace("EMA 20 (Momentum)", "EMA 20 (โมเมนตัม)")
-        label = label.replace("BB Upper (Ceiling)", "BB Upper (เพดานราคา)")
+        label = label.replace("BB Upper (Ceiling)", "BB Upper (ต้านใหญ่)")
         label = label.replace("High 60 Days (Peak)", "High 60 วัน (ยอดดอย)")
         
         # Format MTF
@@ -246,7 +246,7 @@ def ai_hybrid_analysis(price, ema20, ema50, ema200, rsi, macd_val, macd_sig, adx
     bullish_factors = [] 
     bearish_factors = []
     
-    # 1. Trend Analysis (Updated Text)
+    # 1. Trend Analysis (Updated Text with Day context)
     if not np.isnan(ema200):
         if price > ema200:
             score += 3
@@ -270,10 +270,10 @@ def ai_hybrid_analysis(price, ema20, ema50, ema200, rsi, macd_val, macd_sig, adx
     if not np.isnan(macd_val) and not np.isnan(macd_sig):
         if macd_val > macd_sig:
             score += 1
-            bullish_factors.append("MACD ตัดขึ้น (โมเมนตัมบวก)")
+            bullish_factors.append("MACD (Day) ตัดขึ้น (โมเมนตัมบวก)")
         else:
             score -= 1
-            bearish_factors.append("MACD ตัดลง (โมเมนตัมลบ/แรงส่งแผ่ว)")
+            bearish_factors.append("MACD (Day) ตัดลง (โมเมนตัมลบ/แรงส่งแผ่ว)")
 
     # 3. MTF Logic (Fix: Use EMA 200)
     mtf_label = "Week" if mtf_trend != "Unknown" else "MTF"
@@ -298,9 +298,9 @@ def ai_hybrid_analysis(price, ema20, ema50, ema200, rsi, macd_val, macd_sig, adx
     # 5. RSI
     if not np.isnan(rsi):
         if rsi > 70:
-            bearish_factors.append(f"RSI สูงระดับ {rsi:.0f} (Overbought) ระวังแรงเทขายทำกำไร")
+            bearish_factors.append(f"RSI (Day) สูงระดับ {rsi:.0f} (Overbought) ระวังแรงเทขายทำกำไร")
         elif rsi < 30:
-            bullish_factors.append(f"RSI ต่ำระดับ {rsi:.0f} (Oversold) ราคาเริ่มถูก อาจมีเด้งสั้น")
+            bullish_factors.append(f"RSI (Day) ต่ำระดับ {rsi:.0f} (Oversold) ราคาเริ่มถูก อาจมีเด้งสั้น")
 
     # --- Strategy Generator ---
     status_color = "yellow"
@@ -595,7 +595,7 @@ if submit_btn:
                 (ema20, "EMA 20 (Momentum)")
             ]
             raw_supports = sorted([x for x in potential_supports if not np.isnan(x[0]) and x[0] < price and x[0] > 0], key=lambda x: x[0], reverse=True)
-            valid_supports = filter_levels(raw_supports, threshold_pct=0.015)
+            valid_supports = filter_levels(raw_supports, threshold_pct=0.025) # ✅ ปรับระยะห่างเป็น 2.5%
             
             potential_resistances = [
                 (ema20, "EMA 20 (Momentum)"),
@@ -605,7 +605,7 @@ if submit_btn:
                 (high_60d, "High 60 Days (Peak)")
             ]
             raw_resistances = sorted([x for x in potential_resistances if not np.isnan(x[0]) and x[0] > price and x[0] > 0], key=lambda x: x[0])
-            valid_resistances = filter_levels(raw_resistances, threshold_pct=0.015)
+            valid_resistances = filter_levels(raw_resistances, threshold_pct=0.025) # ✅ ปรับระยะห่างเป็น 2.5%
             
             st.markdown("#### 🟢 แนวรับ (Support)")
             if valid_supports:
