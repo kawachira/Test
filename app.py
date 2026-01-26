@@ -9,7 +9,7 @@ from datetime import datetime
 # --- 1. ตั้งค่าหน้าเว็บ ---
 st.set_page_config(page_title="AI Stock Master", page_icon="💎", layout="wide")
 
-# --- 2. CSS ปรับแต่ง (UI สวยงาม) ---
+# --- 2. CSS ปรับแต่ง ---
 st.markdown("""
     <style>
     body { overflow-x: hidden; }
@@ -35,7 +35,7 @@ st.markdown("""
     """, unsafe_allow_html=True)
 
 # --- 3. ส่วนหัวข้อ ---
-st.markdown("<h1>💎 Ai<br><span style='font-size: 1.5rem; opacity: 0.7;'>ระบบวิเคราะห์หุ้นอัจฉริยะ (Bug Fixed)</span></h1>", unsafe_allow_html=True)
+st.markdown("<h1>💎 Ai<br><span style='font-size: 1.5rem; opacity: 0.7;'>ระบบวิเคราะห์หุ้นอัจฉริยะ (Smart Data Load)</span></h1>", unsafe_allow_html=True)
 
 # --- Form ค้นหา ---
 col_space1, col_form, col_space2 = st.columns([1, 2, 1])
@@ -47,6 +47,7 @@ with col_form:
             symbol_input = st.text_input("ชื่อหุ้น (เช่น AMZN,EOSE,RKLB,TSLA)🪐", value="").upper().strip()
         with c2:
             timeframe = st.selectbox("Timeframe:", ["1h (รายชั่วโมง)", "1d (รายวัน)", "1wk (รายสัปดาห์)"], index=1)
+            # Logic การจับคู่ Timeframe (Main -> Multi)
             if "1wk" in timeframe: tf_code = "1wk"; mtf_code = "1mo"
             elif "1h" in timeframe: tf_code = "1h"; mtf_code = "1d"
             else: tf_code = "1d"; mtf_code = "1wk"
@@ -108,11 +109,9 @@ def get_adx_interpretation(adx, is_uptrend):
     if adx >= 20: return "Developing Trend (เริ่มก่อตัว)"
     return "Weak/Sideway (ตลาดไร้ทิศทาง)"
 
-# ✅ Logic Fix: ป้องกันค่า NaN ทำให้โปรแกรมรวน
 def get_detailed_explanation(adx, rsi, macd_val, macd_signal, price, ema200):
-    # Check Valid Data First
     if np.isnan(ema200):
-        is_uptrend = True # Default assumption if data missing to prevent crash text
+        is_uptrend = True 
         trend_context = "ไม่สามารถยืนยันเทรนด์ได้ (ข้อมูล EMA 200 ไม่เพียงพอ)"
     else:
         is_uptrend = price > ema200
@@ -176,15 +175,24 @@ def filter_levels(levels, threshold_pct=0.015):
             if diff > threshold_pct: selected.append((val, label))
     return selected
 
-# --- 5. Data Fetching ---
+# --- 5. Data Fetching (Smart Logic) ---
 @st.cache_data(ttl=10, show_spinner=False)
 def get_data_hybrid(symbol, interval, mtf_interval):
     try:
         ticker = yf.Ticker(symbol)
-        period_val = "730d" if interval == "1h" else "10y"
+        
+        # ✅ SMART SELECTION: เลือกช่วงเวลาตามความเหมาะสมของแต่ละ Timeframe
+        if interval == "1wk":
+            period_val = "10y"  # Week: 10 ปี (ได้ ~520 แท่ง) เหมาะสุดสำหรับ EMA 200
+        elif interval == "1d":
+            period_val = "5y"   # Day: 5 ปี (ได้ ~1,250 แท่ง) เหลือเฟือและไม่หนักเครื่อง
+        else: # 1h
+            period_val = "730d" # Hour: 2 ปี (Max ของ Yahoo)
+
         df = ticker.history(period=period_val, interval=interval)
-        df_mtf = ticker.history(period="5y", interval=mtf_interval)
+        df_mtf = ticker.history(period="5y", interval=mtf_interval) # MTF ดึงกลางๆ ไว้ก่อน
         news = ticker.news
+        
         stock_info = {
             'longName': ticker.info.get('longName', symbol),
             'marketState': ticker.info.get('marketState', 'UNKNOWN'),
@@ -232,7 +240,7 @@ def analyze_news_sentiment(news_list):
             if w in title: score -= 1
     return score
 
-# --- 7. AI Decision Engine (Logic 4.2: Anti-NaN Bug Fix) ---
+# --- 7. AI Decision Engine ---
 def ai_hybrid_analysis(price, ema20, ema50, ema200, rsi, macd_val, macd_sig, adx, bb_up, bb_low, 
                        vol_status, mtf_trend, news_score, atr_val):
     score = 0
@@ -257,7 +265,6 @@ def ai_hybrid_analysis(price, ema20, ema50, ema200, rsi, macd_val, macd_sig, adx
             elif not np.isnan(ema20):
                 bullish_factors.append("ราคาดีดกลับมายืนเหนือ EMA 20 ได้ (ลุ้น Rebound)")
     else:
-        # ถ้า EMA 200 เป็น NaN (ข้อมูลไม่พอ) ให้คะแนนเป็นกลาง
         bullish_factors.append("ข้อมูลกราฟไม่เพียงพอสำหรับ EMA 200 (โปรดระวังความผันผวน)")
 
     # 2. Momentum
@@ -295,14 +302,13 @@ def ai_hybrid_analysis(price, ema20, ema50, ema200, rsi, macd_val, macd_sig, adx
         elif rsi < 30:
             bullish_factors.append(f"RSI ต่ำระดับ {rsi:.0f} (Oversold) ราคาเริ่มถูก อาจมีเด้งสั้น")
 
-    # --- Strategy Generator ---
+    # --- Strategy Generator (7 Levels) ---
     status_color = "yellow"
     banner_title = ""
     strategy_text = ""
     context_text = ""
     holder_advice = ""
 
-    # Safe SL/TP calculation
     sl = price - (2 * atr_val) if not np.isnan(atr_val) else price * 0.95
     tp = price + (3 * atr_val) if not np.isnan(atr_val) else price * 1.05
 
@@ -372,7 +378,7 @@ if submit_btn:
     with st.spinner(f"AI กำลังประมวลผล {symbol_input} แบบ Hybrid Full Loop..."):
         df, info, df_mtf, news = get_data_hybrid(symbol_input, tf_code, mtf_code)
 
-    if df is not None and not df.empty and len(df) > 10: # ผ่อนปรนเงื่อนไข len > 200 เพื่อให้หุ้นใหม่ก็ดูได้
+    if df is not None and not df.empty and len(df) > 10: 
         # Calculations
         df['EMA20'] = ta.ema(df['Close'], length=20)
         df['EMA50'] = ta.ema(df['Close'], length=50)
@@ -397,7 +403,6 @@ if submit_btn:
         last = df.iloc[-1]
         price = info['regularMarketPrice'] if info['regularMarketPrice'] else last['Close']
         
-        # Safe Get Values
         rsi = last['RSI'] if 'RSI' in last else np.nan
         atr = last['ATR'] if 'ATR' in last else np.nan
         ema20 = last['EMA20'] if 'EMA20' in last else np.nan
@@ -422,7 +427,6 @@ if submit_btn:
         
         if df_mtf is not None and not df_mtf.empty and len(df_mtf) > 50:
             df_mtf['EMA50'] = ta.ema(df_mtf['Close'], length=50)
-            # Check NaN for MTF as well
             if not pd.isna(df_mtf['EMA50'].iloc[-1]):
                 if df_mtf['Close'].iloc[-1] > df_mtf['EMA50'].iloc[-1]: mtf_trend = "Bullish"
                 else: mtf_trend = "Bearish"
@@ -609,10 +613,9 @@ if submit_btn:
                 sent_icon = "😊" if news_score > 0 else "😡" if news_score < 0 else "😐"
                 st.info(f"📰 **Sentiment:** {sent_icon} Score: {news_score} (ประเมินจากพาดหัวข่าว {len(news)} ข่าวล่าสุด)")
 
-            # ✅ UPDATE: ส่วนแสดงผล Highlight Box (ตามที่คุณขอ "ทำให้เด่น")
+            # ✅ UPDATE: ส่วนแสดงผล Highlight Box
             st.subheader("🤖 AI STRATEGY (บทสรุป)")
             
-            # Map status to colors for the banner
             color_map = {
                 "green": {"bg": "#dcfce7", "border": "#22c55e", "text": "#14532d"},
                 "red": {"bg": "#fee2e2", "border": "#ef4444", "text": "#7f1d1d"},
@@ -621,7 +624,6 @@ if submit_btn:
             }
             c_theme = color_map.get(ai_report['status_color'], color_map["yellow"])
 
-            # Create a Custom Card
             st.markdown(f"""
             <div style="
                 background-color: {c_theme['bg']};
