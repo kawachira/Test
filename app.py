@@ -6,10 +6,10 @@ import numpy as np
 import time
 from datetime import datetime
 
-# --- 1. ตั้งค่าหน้าเว็บ (คงเดิม) ---
+# --- 1. ตั้งค่าหน้าเว็บ (คงเดิมตาม Code 2) ---
 st.set_page_config(page_title="AI Stock Master", page_icon="💎", layout="wide")
 
-# --- 2. CSS ปรับแต่ง (คงเดิม) ---
+# --- 2. CSS ปรับแต่ง (คงเดิมตาม Code 2) ---
 st.markdown("""
     <style>
     body { overflow-x: hidden; }
@@ -34,10 +34,10 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# --- 3. ส่วนหัวข้อ (คงเดิม) ---
+# --- 3. ส่วนหัวข้อ (คงเดิมตาม Code 2) ---
 st.markdown("<h1>💎 Ai<br><span style='font-size: 1.5rem; opacity: 0.7;'>ระบบวิเคราะห์หุ้นอัจฉริยะ (Hybrid Sniper)</span></h1>", unsafe_allow_html=True)
 
-# --- Form ค้นหา (คงเดิม) ---
+# --- Form ค้นหา (คงเดิมตาม Code 2) ---
 col_space1, col_form, col_space2 = st.columns([1, 2, 1])
 with col_form:
     with st.form(key='search_form'):
@@ -122,21 +122,50 @@ def get_detailed_explanation(adx, rsi, macd_val, macd_signal, price, ema200):
 
     return adx_explain, rsi_explain, macd_explain
 
+# ✅ UPDATE: นำฟังก์ชัน display_learning_section ของ Code 1 มาใช้ เพื่อให้มีคำอธิบายละเอียด
 def display_learning_section(rsi, rsi_interp, macd_val, macd_signal, macd_interp, adx_val, price, ema200, bb_upper, bb_lower):
     is_up = price >= ema200
     adx_interp = get_adx_interpretation(adx_val, is_up)
     
     st.markdown("### 📘 มุมความรู้: ค่าต่างๆ คืออะไร? มาจากไหน?")
     with st.expander("คลิกเพื่อเรียนรู้ความหมายของอินดิเคเตอร์แต่ละตัว", expanded=False):
+        # 1. MACD
         st.markdown(f"#### 1. MACD (Moving Average Convergence Divergence)\n* **ค่าปัจจุบัน:** `{macd_val:.3f}` -> {macd_interp}")
+        st.markdown("* **คืออะไร?:** เครื่องมือดู 'โมเมนตัม' หรือแรงส่งของราคา")
+        st.markdown("* **มาจากไหน?:** เกิดจากการเอาเส้นค่าเฉลี่ย 2 เส้นมาลบกัน คือ **EMA(12) - EMA(26)**")
         st.divider()
+        
+        # 2. RSI
         st.markdown(f"#### 2. RSI (Relative Strength Index)\n* **ค่าปัจจุบัน:** `{rsi:.2f}` -> {rsi_interp}")
+        st.markdown("* **คืออะไร?:** ดัชนีวัดการ 'ซื้อมากเกินไป' หรือ 'ขายมากเกินไป'")
+        st.markdown("* **มาจากไหน?:** คำนวณจากสัดส่วนของวันที่หุ้นขึ้นเทียบกับวันที่หุ้นลงในรอบ 14 วัน")
         st.divider()
+        
+        # 3. ADX
         st.markdown(f"#### 3. ADX (Average Directional Index)\n* **ค่าปัจจุบัน:** `{adx_val:.2f}` -> {adx_interp}")
+        st.markdown("* **คืออะไร?:** เครื่องมือวัด 'ความรุนแรงของเทรนด์' (ไม่บอกทิศทาง บอกแค่ว่าแรงไหม)")
         st.divider()
+        
+        # 4. Bollinger Bands
         st.markdown(f"#### 4. Bollinger Bands (BB)\n* **Upper:** `{bb_upper:.2f}` | **Lower:** `{bb_lower:.2f}`")
+        st.markdown("* **คืออะไร?:** กรอบการแกว่งตัวของราคาเปรียบเหมือนขอบถนน ถ้าราคาทะลุออกไปมักจะเด้งกลับเข้ามา")
 
-# --- 5. Data Fetching ---
+# ✅ UPDATE: เพิ่มฟังก์ชัน Filter Levels จาก Code 1 มาใส่
+def filter_levels(levels, threshold_pct=0.015):
+    selected = []
+    # เรียงลำดับก่อน (จากมากไปน้อย หรือ น้อยไปมาก แล้วแต่ input แต่ในที่นี้เราจัดการข้างนอกแล้ว)
+    for val, label in levels:
+        if not selected:
+            selected.append((val, label))
+        else:
+            last_val = selected[-1][0]
+            # คำนวณความต่างเป็น % (Code 1 Logic)
+            diff = abs(val - last_val) / last_val
+            if diff > threshold_pct: 
+                selected.append((val, label))
+    return selected
+
+# --- 5. Data Fetching (คงเดิมตาม Code 2) ---
 @st.cache_data(ttl=10, show_spinner=False)
 def get_data_hybrid(symbol, interval, mtf_interval):
     try:
@@ -171,7 +200,7 @@ def get_data_hybrid(symbol, interval, mtf_interval):
     except:
         return None, None, None, None
 
-# --- 6. Analysis Logic ---
+# --- 6. Analysis Logic (คงเดิมตาม Code 2) ---
 def analyze_volume(row, vol_ma):
     vol = row['Volume']
     if vol > vol_ma * 1.5: return "High Volume", "green"
@@ -191,7 +220,7 @@ def analyze_news_sentiment(news_list):
             if w in title: score -= 1
     return score
 
-# --- 7. AI Decision Engine ---
+# --- 7. AI Decision Engine (คงเดิมตาม Code 2) ---
 def ai_hybrid_analysis(price, ema20, ema50, ema200, rsi, macd_val, macd_sig, adx, bb_up, bb_low, 
                        vol_status, mtf_trend, news_score, atr_val):
     score = 0
@@ -456,7 +485,10 @@ if submit_btn:
                         (ema50, "EMA 50 (Short Trend)"),
                         (ema20, "EMA 20 (Momentum)")
                     ]
-                    valid_supports = sorted([x for x in potential_supports if x[0] < price and x[0] > 0], key=lambda x: x[0], reverse=True)
+                    # กรองเฉพาะที่น้อยกว่าราคาปัจจุบัน
+                    raw_supports = sorted([x for x in potential_supports if x[0] < price and x[0] > 0], key=lambda x: x[0], reverse=True)
+                    # ✅ UPDATE: ใช้ filter_levels แบบ % จาก Code 1 (แทนการใช้ 0.05 แบบเดิม)
+                    valid_supports = filter_levels(raw_supports, threshold_pct=0.015)
                     
                     # Resistances
                     potential_resistances = [
@@ -466,16 +498,14 @@ if submit_btn:
                         (bb_upper, "BB Upper (Ceiling)"),
                         (high_60d, "High 60 Days (Peak)")
                     ]
-                    valid_resistances = sorted([x for x in potential_resistances if x[0] > price and x[0] > 0], key=lambda x: x[0])
+                    # กรองเฉพาะที่มากกว่าราคาปัจจุบัน
+                    raw_resistances = sorted([x for x in potential_resistances if x[0] > price and x[0] > 0], key=lambda x: x[0])
+                    # ✅ UPDATE: ใช้ filter_levels แบบ % จาก Code 1
+                    valid_resistances = filter_levels(raw_resistances, threshold_pct=0.015)
                     
                     st.markdown("#### 🟢 แนวรับ (Strategic Supports)")
                     if valid_supports:
-                        count = 0; used_vals = []
-                        for v, d in valid_supports:
-                            if not any(abs(v - uv) < 0.05 for uv in used_vals): 
-                                st.write(f"- **{v:.2f}** : {d}")
-                                used_vals.append(v); count += 1
-                            if count >= 3: break
+                        for v, d in valid_supports[:3]: st.write(f"- **{v:.2f}** : {d}")
                     else: st.write("- ราคาทำ All Time High / ไม่มีแนวรับใกล้เคียง")
                     
                     st.markdown("#### 🔴 แนวต้าน (Resistances)")
@@ -511,10 +541,10 @@ if submit_btn:
                 st.markdown("""<div class='disclaimer-box'>⚠️ <b>หมายเหตุ:</b> ข้อมูลนี้มาจากการวิเคราะห์ทางเทคนิคด้วยระบบ AI (Hybrid Logic) เพื่อประกอบการตัดสินใจเท่านั้น <br>ผู้ใช้งานควรศึกษาก่อนการลงทุน ผู้พัฒนาไม่รับผิดชอบต่อความเสียหายใดๆ ที่เกิดขึ้นจากการนำข้อมูลนี้ไปใช้</div>""", unsafe_allow_html=True)
                 st.divider()
                 
-                # --- FIXED: Define Variables before calling function ---
                 rsi_interp_str = get_rsi_interpretation(rsi)
-                macd_interp_str = "🟢 Bullish" if macd_val > macd_signal else "🔴 Bearish" # ประกาศตัวแปรที่ขาดหายไปตรงนี้ครับ
+                macd_interp_str = "🟢 Bullish" if macd_val > macd_signal else "🔴 Bearish"
                 
+                # ✅ UPDATE: เรียกใช้ display_learning_section (เวอร์ชั่นอัปเกรดแล้ว)
                 display_learning_section(rsi, rsi_interp_str, macd_val, macd_signal, macd_interp_str, adx_val, price, ema200, bb_upper, bb_lower)
             else:
                 st.error("ไม่พบข้อมูลหุ้น หรือ ข้อมูลไม่เพียงพอสำหรับคำนวณ Indicator (ต้องมีมากกว่า 200 แท่งเทียน)")
