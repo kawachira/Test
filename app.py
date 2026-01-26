@@ -6,10 +6,10 @@ import numpy as np
 import time
 from datetime import datetime
 
-# --- 1. ตั้งค่าหน้าเว็บ (คงเดิมตาม Code 2) ---
+# --- 1. ตั้งค่าหน้าเว็บ ---
 st.set_page_config(page_title="AI Stock Master", page_icon="💎", layout="wide")
 
-# --- 2. CSS ปรับแต่ง (คงเดิมตาม Code 2) ---
+# --- 2. CSS ปรับแต่ง ---
 st.markdown("""
     <style>
     body { overflow-x: hidden; }
@@ -34,10 +34,10 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# --- 3. ส่วนหัวข้อ (คงเดิมตาม Code 2) ---
+# --- 3. ส่วนหัวข้อ ---
 st.markdown("<h1>💎 Ai<br><span style='font-size: 1.5rem; opacity: 0.7;'>ระบบวิเคราะห์หุ้นอัจฉริยะ (Hybrid Sniper)</span></h1>", unsafe_allow_html=True)
 
-# --- Form ค้นหา (คงเดิมตาม Code 2) ---
+# --- Form ค้นหา ---
 col_space1, col_form, col_space2 = st.columns([1, 2, 1])
 with col_form:
     with st.form(key='search_form'):
@@ -47,7 +47,6 @@ with col_form:
             symbol_input = st.text_input("ชื่อหุ้น (เช่น AMZN,EOSE,RKLB,TSLA)🪐", value="").upper().strip()
         with c2:
             timeframe = st.selectbox("Timeframe:", ["1h (รายชั่วโมง)", "1d (รายวัน)", "1wk (รายสัปดาห์)"], index=1)
-            # Logic: 1h->Day, Day->Week, Week->Month
             if "1wk" in timeframe: tf_code = "1wk"; mtf_code = "1mo"
             elif "1h" in timeframe: tf_code = "1h"; mtf_code = "1d"
             else: tf_code = "1d"; mtf_code = "1wk"
@@ -61,10 +60,17 @@ def arrow_html(change):
     if change is None: return ""
     return "<span style='color:#16a34a;font-weight:600'>▲</span>" if change > 0 else "<span style='color:#dc2626;font-weight:600'>▼</span>"
 
+# ✅ UPDATE: ฟังก์ชันแปลงตัวเลข Volume (เช่น 1,000,000 -> 1M)
+def format_volume(vol):
+    if vol >= 1_000_000_000: return f"{vol/1_000_000_000:.2f}B"
+    if vol >= 1_000_000: return f"{vol/1_000_000:.2f}M"
+    if vol >= 1_000: return f"{vol/1_000:.2f}K"
+    return f"{vol:,.0f}"
+
 def custom_metric_html(label, value, status_text, color_status, icon_svg):
     if color_status == "green": color_code = "#16a34a"
     elif color_status == "red": color_code = "#dc2626"
-    else: color_code = "#a3a3a3" # สีเทา
+    else: color_code = "#a3a3a3"
     
     html = f"""
     <div style="margin-bottom: 15px;">
@@ -94,78 +100,70 @@ def get_pe_interpretation(pe):
     if pe < 30: return "ราคาเหมาะสม (Fair)"
     return "หุ้นแพง (Growth)"
 
-# --- Smart ADX Interpretation ---
 def get_adx_interpretation(adx, is_uptrend):
-    trend_str = "ขาขึ้น (Uptrend)" if is_uptrend else "ขาลง (Downtrend)"
+    trend_str = "ขาขึ้น" if is_uptrend else "ขาลง"
     if adx >= 50: return f"Super Strong {trend_str} (แรงมาก)"
     if adx >= 25: return f"Strong {trend_str} (แข็งแกร่ง)"
     if adx >= 20: return "Developing Trend (เริ่มก่อตัว)"
     return "Weak/Sideway (ตลาดไร้ทิศทาง)"
 
+# ✅ UPDATE: ปรับคำอธิบาย AI ให้เป็นภาษาชาวบ้าน เข้าใจง่าย
 def get_detailed_explanation(adx, rsi, macd_val, macd_signal, price, ema200):
-    if price > ema200: trend_dir = "ขาขึ้น (Uptrend)"
-    else: trend_dir = "ขาลง (Downtrend)"
+    if price > ema200: 
+        trend_dir = "ขาขึ้น"
+        trend_context = "ราคาอยู่เหนือเส้นค่าเฉลี่ยระยะยาว (ภาพรวมดูดี)"
+    else: 
+        trend_dir = "ขาลง"
+        trend_context = "ราคาอยู่ใต้เส้นค่าเฉลี่ยระยะยาว (ภาพรวมยังแย่)"
         
-    if adx >= 50: adx_str = f"ระดับ 'รุนแรงมาก' (Super Strong) ในทิศทาง **{trend_dir}**"
-    elif adx >= 25: adx_str = f"ระดับ 'แข็งแกร่ง' (Strong) ในทิศทาง **{trend_dir}**"
-    elif adx >= 20: adx_str = "ระดับ 'กำลังก่อตัว' (Developing)"
-    else: adx_str = "ระดับ 'อ่อนแอ/ไม่มีเทรนด์' (Weak)"
-    
-    adx_explain = f"ค่า **{adx:.2f}** บ่งบอกถึงเทรนด์ที่ {adx_str}"
+    # ADX Explanation
+    if adx >= 50: adx_explain = f"🔥 **เทรนด์แรงระดับทะลุปรอท:** ตอนนี้ตลาดกำลังวิ่งเป็น '{trend_dir}' แบบรุนแรงมาก ระวังจุดพีคหรือการกลับตัวฉับพลัน"
+    elif adx >= 25: adx_explain = f"💪 **เทรนด์แข็งแกร่ง:** ตลาดมีทิศทาง '{trend_dir}' ที่ชัดเจน ไม่ใช่การแกว่งตัวมั่วๆ เป็นจังหวะที่น่าสนใจ"
+    elif adx >= 20: adx_explain = f"🌱 **เทรนด์เริ่มก่อตัว:** เหมือนรถเพิ่งสตาร์ทออกตัวในทิศทาง '{trend_dir}' แรงส่งยังไม่เยอะมากแต่เริ่มมาแล้ว"
+    else: adx_explain = "😴 **ตลาดซึม/พักตัว:** แรงซื้อแรงขายยังไม่เลือกทางชัดเจน ราคาอาจจะแกว่งออกข้าง (Sideway) น่าเบื่อหน่อย"
 
-    if rsi >= 70: rsi_explain = f"ค่า **{rsi:.2f}** สูงเกิน 70 (Overbought) ระวังแรงขายทำกำไร"
-    elif rsi <= 30: rsi_explain = f"ค่า **{rsi:.2f}** ต่ำกว่า 30 (Oversold) ระวังแรงซื้อสวนกลับ"
-    else: rsi_explain = f"ค่า **{rsi:.2f}** อยู่ในช่วงกลาง (Neutral) ราคาสมเหตุสมผล"
+    # RSI Explanation
+    if rsi >= 70: rsi_explain = "⚠️ **ราคาแพง/ตึงตัวไปหน่อย (Overbought):** คนแห่ซื้อกันเยอะเกินไป อาจจะมีแรงเทขายทำกำไรออกมา ให้ระวังการไล่ราคา"
+    elif rsi <= 30: rsi_explain = "💎 **ราคาถูก/ขายมากเกินไป (Oversold):** คนเทขายจนของเริ่มถูก อาจจะมีคนรอเก็บของสวนขึ้นมา (ลุ้นเด้งสั้น)"
+    else: rsi_explain = "⚖️ **ราคาสมเหตุสมผล:** ไม่ถูกและไม่แพงเกินไป ซื้อขายกันตามปกติ"
 
-    if macd_val > macd_signal: macd_explain = f"ค่า **{macd_val:.3f}** ตัดขึ้นเหนือ Signal (Bullish Momentum)"
-    else: macd_explain = f"ค่า **{macd_val:.3f}** ตัดลงต่ำกว่า Signal (Bearish Momentum)"
+    # MACD Explanation
+    if macd_val > macd_signal: 
+        macd_explain = "🟢 **แรงซื้อชนะแรงขาย:** โมเมนตัมเป็นบวก เหมือนเหยียบคันเร่งขึ้นเขา"
+    else: 
+        macd_explain = "🔴 **แรงขายชนะแรงซื้อ:** โมเมนตัมเป็นลบ เหมือนรถกำลังถอยหลังหรือผ่อนคันเร่ง"
 
-    return adx_explain, rsi_explain, macd_explain
+    return adx_explain, rsi_explain, macd_explain, trend_context
 
-# ✅ UPDATE: นำฟังก์ชัน display_learning_section ของ Code 1 มาใช้ เพื่อให้มีคำอธิบายละเอียด
 def display_learning_section(rsi, rsi_interp, macd_val, macd_signal, macd_interp, adx_val, price, ema200, bb_upper, bb_lower):
     is_up = price >= ema200
     adx_interp = get_adx_interpretation(adx_val, is_up)
     
     st.markdown("### 📘 มุมความรู้: ค่าต่างๆ คืออะไร? มาจากไหน?")
     with st.expander("คลิกเพื่อเรียนรู้ความหมายของอินดิเคเตอร์แต่ละตัว", expanded=False):
-        # 1. MACD
         st.markdown(f"#### 1. MACD (Moving Average Convergence Divergence)\n* **ค่าปัจจุบัน:** `{macd_val:.3f}` -> {macd_interp}")
-        st.markdown("* **คืออะไร?:** เครื่องมือดู 'โมเมนตัม' หรือแรงส่งของราคา")
-        st.markdown("* **มาจากไหน?:** เกิดจากการเอาเส้นค่าเฉลี่ย 2 เส้นมาลบกัน คือ **EMA(12) - EMA(26)**")
+        st.markdown("* **คืออะไร?:** เครื่องมือดู 'โมเมนตัม' หรือแรงส่งของราคา\n* **มาจากไหน?:** เกิดจากการเอาเส้นค่าเฉลี่ย 2 เส้นมาลบกัน คือ **EMA(12) - EMA(26)**")
         st.divider()
-        
-        # 2. RSI
         st.markdown(f"#### 2. RSI (Relative Strength Index)\n* **ค่าปัจจุบัน:** `{rsi:.2f}` -> {rsi_interp}")
-        st.markdown("* **คืออะไร?:** ดัชนีวัดการ 'ซื้อมากเกินไป' หรือ 'ขายมากเกินไป'")
-        st.markdown("* **มาจากไหน?:** คำนวณจากสัดส่วนของวันที่หุ้นขึ้นเทียบกับวันที่หุ้นลงในรอบ 14 วัน")
+        st.markdown("* **คืออะไร?:** ดัชนีวัดการ 'ซื้อมากเกินไป' หรือ 'ขายมากเกินไป'\n* **มาจากไหน?:** คำนวณจากสัดส่วนของวันที่หุ้นขึ้นเทียบกับวันที่หุ้นลงในรอบ 14 วัน")
         st.divider()
-        
-        # 3. ADX
         st.markdown(f"#### 3. ADX (Average Directional Index)\n* **ค่าปัจจุบัน:** `{adx_val:.2f}` -> {adx_interp}")
         st.markdown("* **คืออะไร?:** เครื่องมือวัด 'ความรุนแรงของเทรนด์' (ไม่บอกทิศทาง บอกแค่ว่าแรงไหม)")
         st.divider()
-        
-        # 4. Bollinger Bands
         st.markdown(f"#### 4. Bollinger Bands (BB)\n* **Upper:** `{bb_upper:.2f}` | **Lower:** `{bb_lower:.2f}`")
         st.markdown("* **คืออะไร?:** กรอบการแกว่งตัวของราคาเปรียบเหมือนขอบถนน ถ้าราคาทะลุออกไปมักจะเด้งกลับเข้ามา")
 
-# ✅ UPDATE: เพิ่มฟังก์ชัน Filter Levels จาก Code 1 มาใส่
 def filter_levels(levels, threshold_pct=0.015):
     selected = []
-    # เรียงลำดับก่อน (จากมากไปน้อย หรือ น้อยไปมาก แล้วแต่ input แต่ในที่นี้เราจัดการข้างนอกแล้ว)
     for val, label in levels:
-        if not selected:
-            selected.append((val, label))
+        if not selected: selected.append((val, label))
         else:
             last_val = selected[-1][0]
-            # คำนวณความต่างเป็น % (Code 1 Logic)
             diff = abs(val - last_val) / last_val
-            if diff > threshold_pct: 
-                selected.append((val, label))
+            if diff > threshold_pct: selected.append((val, label))
     return selected
 
-# --- 5. Data Fetching (คงเดิมตาม Code 2) ---
+# --- 5. Data Fetching ---
 @st.cache_data(ttl=10, show_spinner=False)
 def get_data_hybrid(symbol, interval, mtf_interval):
     try:
@@ -200,18 +198,18 @@ def get_data_hybrid(symbol, interval, mtf_interval):
     except:
         return None, None, None, None
 
-# --- 6. Analysis Logic (คงเดิมตาม Code 2) ---
+# --- 6. Analysis Logic ---
 def analyze_volume(row, vol_ma):
     vol = row['Volume']
-    if vol > vol_ma * 1.5: return "High Volume", "green"
-    elif vol < vol_ma * 0.7: return "Low Volume", "red"
-    else: return "Normal Volume", "gray"
+    if vol > vol_ma * 1.5: return "High Volume (วอลุ่มเข้า)", "green"
+    elif vol < vol_ma * 0.7: return "Low Volume (เหือดแห้ง)", "red"
+    else: return "Normal Volume (ปกติ)", "gray"
 
 def analyze_news_sentiment(news_list):
     if not news_list: return "No News", 0
     score = 0
-    bullish_keywords = ['soar', 'jump', 'surge', 'beat', 'profit', 'growth', 'buy', 'strong', 'record']
-    bearish_keywords = ['drop', 'fall', 'plunge', 'miss', 'loss', 'down', 'sell', 'weak', 'crash']
+    bullish_keywords = ['soar', 'jump', 'surge', 'beat', 'profit', 'growth', 'buy', 'strong', 'record', 'up']
+    bearish_keywords = ['drop', 'fall', 'plunge', 'miss', 'loss', 'down', 'sell', 'weak', 'crash', 'risk']
     for item in news_list[:5]:
         title = item.get('title', '').lower()
         for w in bullish_keywords: 
@@ -220,7 +218,7 @@ def analyze_news_sentiment(news_list):
             if w in title: score -= 1
     return score
 
-# --- 7. AI Decision Engine (คงเดิมตาม Code 2) ---
+# --- 7. AI Decision Engine ---
 def ai_hybrid_analysis(price, ema20, ema50, ema200, rsi, macd_val, macd_sig, adx, bb_up, bb_low, 
                        vol_status, mtf_trend, news_score, atr_val):
     score = 0
@@ -229,14 +227,14 @@ def ai_hybrid_analysis(price, ema20, ema50, ema200, rsi, macd_val, macd_sig, adx
     
     # Trend (40%)
     if price > ema200:
-        if price > ema20: score += 3; reasons.append("Price > EMA20/200 (Uptrend)")
-        else: score += 1; reasons.append("Pullback in Uptrend")
+        if price > ema20: score += 3; reasons.append("ราคายืนเหนือ EMA ระยะสั้นและยาว (ขาขึ้น)")
+        else: score += 1; reasons.append("เทรนด์หลักขาขึ้น แต่ระยะสั้นย่อตัว")
     else:
-        score -= 3; reasons.append("Price < EMA200 (Downtrend)")
+        score -= 3; reasons.append("ราคาอยู่ใต้ EMA 200 (เทรนด์หลักขาลง)")
         
     # MTF (20%)
-    if mtf_trend == "Bullish": score += 2; reasons.append("Major Timeframe Bullish")
-    elif mtf_trend == "Bearish": score -= 2; warnings.append("Major Timeframe Bearish")
+    if mtf_trend == "Bullish": score += 2; reasons.append("Timeframe ใหญ่ (วีค/เดือน) เป็นขาขึ้นสนับสนุน")
+    elif mtf_trend == "Bearish": score -= 2; warnings.append("Timeframe ใหญ่ (วีค/เดือน) ยังเป็นขาลงกดดันอยู่")
     
     # Momentum (20%)
     if macd_val > macd_sig: score += 1
@@ -249,29 +247,29 @@ def ai_hybrid_analysis(price, ema20, ema50, ema200, rsi, macd_val, macd_sig, adx
     # Strategy
     status_color = "yellow"
     banner_title = "Sideway: รอเลือกทาง"
-    strategy_text = "Wait & See"
-    context = "ตลาดยังไม่เลือกทางชัดเจน"
+    strategy_text = "Wait & See (รอดูไปก่อน)"
+    context = "ตลาดยังไม่เลือกทางชัดเจน พักตัวออกข้าง"
     
     if score >= 5:
         status_color = "green"
         banner_title = "🚀 Super Bullish: ขาขึ้นสมบูรณ์แบบ"
-        strategy_text = "Strong Buy / Let Profit Run"
-        context = "ทุกปัจจัย (Trend, MTF, Volume) สนับสนุนขาขึ้น"
+        strategy_text = "Strong Buy / Let Profit Run (ถือต่อ/ซื้อเพิ่ม)"
+        context = "ทุกปัจจัย (เทรนด์, ภาพใหญ่, วอลุ่ม) สนับสนุนขาขึ้นเต็มที่"
     elif score >= 2:
         status_color = "green"
         banner_title = "Bullish: แนวโน้มขาขึ้น"
-        strategy_text = "Buy on Dip (ย่อซื้อ)"
-        context = "เทรนด์หลักดี แต่อาจมีการพักตัวระยะสั้น"
+        strategy_text = "Buy on Dip (รอย่อแล้วซื้อ)"
+        context = "เทรนด์หลักดี แต่อาจมีการพักตัวระยะสั้น หาจังหวะย่อซื้อได้เปรียบ"
     elif score <= -4:
         status_color = "red"
         banner_title = "Bearish: ขาลงเต็มตัว"
-        strategy_text = "Strong Sell / Avoid"
-        context = "โครงสร้างราคาพังเสียหาย และ Timeframe ใหญ่กดดัน"
+        strategy_text = "Strong Sell / Avoid (ขายทิ้ง/ห้ามยุ่ง)"
+        context = "โครงสร้างราคาเสียและ Timeframe ใหญ่กดดัน อย่าเพิ่งรับมีด"
     elif score <= -1:
         status_color = "orange"
         banner_title = "Correction/Weak: เริ่มอ่อนแอ"
-        strategy_text = "Defensive / Sell on Rally"
-        context = "แรงส่งเริ่มหมด ระวังการปรับฐาน"
+        strategy_text = "Defensive (ระวังตัว/แบ่งขาย)"
+        context = "แรงส่งเริ่มหมด ระวังการปรับฐานหรือลงต่อ"
 
     sl = price - (2 * atr_val)
     tp = price + (3 * atr_val)
@@ -325,6 +323,7 @@ if submit_btn:
                 rsi = last['RSI']
                 atr = last['ATR']
                 ema20=last['EMA20']; ema50=last['EMA50']; ema200=last['EMA200']
+                vol_now = last['Volume'] # เอาไว้โชว์ค่า Volume
                 
                 try: macd_val, macd_signal = last['MACD_12_26_9'], last['MACDs_12_26_9']
                 except: macd_val, macd_signal = 0, 0
@@ -440,7 +439,7 @@ if submit_btn:
 
                 # 3. ADX (SMART & CONTEXT AWARE)
                 with c5:
-                    is_uptrend = price >= ema200 # ใช้ EMA 200 เป็นเกณฑ์ทิศทาง
+                    is_uptrend = price >= ema200
                     adx_text = get_adx_interpretation(adx_val, is_uptrend)
                     
                     if adx_val >= 25: # Strong Zone
@@ -460,14 +459,18 @@ if submit_btn:
                 c_ema, c_ai = st.columns([1.5, 2])
                 with c_ema:
                     st.subheader("📉 Technical Indicators")
+                    
+                    # ✅ UPDATE: โชว์ค่า Volume แบบย่อ (e.g. 24M) และ ATR อธิบายเพิ่ม
+                    vol_str = format_volume(vol_now)
+                    
                     st.markdown(f"""
                     <div style='background-color: var(--secondary-background-color); padding: 15px; border-radius: 10px; font-size: 0.95rem;'>
                         <div style='display:flex; justify-content:space-between; margin-bottom:5px; border-bottom:1px solid #ddd; font-weight:bold;'><span>Indicator</span> <span>Value</span></div>
                         <div style='display:flex; justify-content:space-between;'><span>EMA 20</span> <span>{ema20:.2f}</span></div>
                         <div style='display:flex; justify-content:space-between;'><span>EMA 200</span> <span>{ema200:.2f}</span></div>
                         <div style='display:flex; justify-content:space-between;'><span>MACD</span> <span style='color:{'green' if macd_val > macd_signal else 'red'}'>{macd_val:.3f}</span></div>
-                        <div style='display:flex; justify-content:space-between;'><span>Volume Status</span> <span style='color:{vol_color}'>{vol_status}</span></div>
-                        <div style='display:flex; justify-content:space-between;'><span>ATR (Volatility)</span> <span>{atr:.2f}</span></div>
+                        <div style='display:flex; justify-content:space-between;'><span>Volume ({vol_str})</span> <span style='color:{vol_color}'>{vol_status.split(' ')[0]}</span></div>
+                        <div style='display:flex; justify-content:space-between;'><span>ATR (ราคาแกว่งเฉลี่ย)</span> <span>{atr:.2f}</span></div>
                     </div>
                     """, unsafe_allow_html=True)
                     
@@ -476,7 +479,6 @@ if submit_btn:
                     high_60d = df['High'].tail(60).max()
                     mtf_label_str = f"EMA 200 ({mtf_code.upper()})" if mtf_ema200_val > 0 else "MTF EMA 200 (N/A)"
                     
-                    # Sniper Supports Logic
                     potential_supports = [
                         (bb_lower, "BB Lower (Volatility)"),
                         (low_60d, "Low 60 Days (Price Action)"),
@@ -485,12 +487,9 @@ if submit_btn:
                         (ema50, "EMA 50 (Short Trend)"),
                         (ema20, "EMA 20 (Momentum)")
                     ]
-                    # กรองเฉพาะที่น้อยกว่าราคาปัจจุบัน
                     raw_supports = sorted([x for x in potential_supports if x[0] < price and x[0] > 0], key=lambda x: x[0], reverse=True)
-                    # ✅ UPDATE: ใช้ filter_levels แบบ % จาก Code 1 (แทนการใช้ 0.05 แบบเดิม)
                     valid_supports = filter_levels(raw_supports, threshold_pct=0.015)
                     
-                    # Resistances
                     potential_resistances = [
                         (ema20, "EMA 20 (Momentum)"),
                         (ema50, "EMA 50 (Short Trend)"),
@@ -498,9 +497,7 @@ if submit_btn:
                         (bb_upper, "BB Upper (Ceiling)"),
                         (high_60d, "High 60 Days (Peak)")
                     ]
-                    # กรองเฉพาะที่มากกว่าราคาปัจจุบัน
                     raw_resistances = sorted([x for x in potential_resistances if x[0] > price and x[0] > 0], key=lambda x: x[0])
-                    # ✅ UPDATE: ใช้ filter_levels แบบ % จาก Code 1
                     valid_resistances = filter_levels(raw_resistances, threshold_pct=0.015)
                     
                     st.markdown("#### 🟢 แนวรับ (Strategic Supports)")
@@ -514,28 +511,30 @@ if submit_btn:
                     else: st.write("- ราคาทำ All Time Low / ไม่มีแนวต้านใกล้เคียง")
 
                 with c_ai:
-                    exp_adx, exp_rsi, exp_macd = get_detailed_explanation(adx_val, rsi, macd_val, macd_signal, price, ema200)
-                    st.subheader("🧐 AI Deep Analysis")
+                    # ✅ UPDATE: เรียกฟังก์ชัน AI อธิบายแบบภาษาชาวบ้าน
+                    exp_adx, exp_rsi, exp_macd, exp_trend = get_detailed_explanation(adx_val, rsi, macd_val, macd_signal, price, ema200)
+                    
+                    st.subheader("🧐 AI Deep Analysis (ฉบับเข้าใจง่าย)")
                     with st.container():
-                        st.info(f"💪 **ADX:** {exp_adx}")
-                        st.info(f"🌊 **MACD:** {exp_macd}")
+                        st.info(f"{exp_adx}")
+                        st.info(f"{exp_macd}")
                         sent_icon = "😊" if news_score > 0 else "😡" if news_score < 0 else "😐"
-                        st.info(f"📰 **Sentiment:** {sent_icon} Score: {news_score} (ประเมินจากข่าวล่าสุด)")
+                        st.info(f"📰 **Sentiment:** {sent_icon} Score: {news_score} (ประเมินจากพาดหัวข่าว {len(news)} ข่าวล่าสุด)")
 
                     st.subheader("🤖 AI STRATEGY")
                     with st.chat_message("assistant"):
                         st.markdown(f"### 🎯 {ai_report['strategy']}")
-                        st.write(f"**Context:** {ai_report['context']}")
+                        st.write(f"**ภาพรวม:** {ai_report['context']}")
                         if ai_report['reasons']:
-                            st.markdown("**✅ Pros:**")
+                            st.markdown("**✅ ข้อดี (Pros):**")
                             for r in ai_report['reasons']: st.write(f"- {r}")
                         if ai_report['warnings']:
-                            st.markdown("**⚠️ Cons:**")
+                            st.markdown("**⚠️ ข้อควรระวัง (Cons):**")
                             for w in ai_report['warnings']: st.write(f"- {w}")
                         st.markdown("---")
-                        st.markdown(f"**🛡️ Risk Management (ATR Based):**")
-                        st.write(f"🛑 **Stop Loss:** {ai_report['sl']:.2f}")
-                        st.write(f"✅ **Take Profit:** {ai_report['tp']:.2f}")
+                        st.markdown(f"**🛡️ แผนควบคุมความเสี่ยง (Risk Management):**")
+                        st.write(f"🛑 **ตัดขาดทุน (Stop Loss):** {ai_report['sl']:.2f}")
+                        st.write(f"✅ **ขายทำกำไร (Take Profit):** {ai_report['tp']:.2f}")
 
                 st.write("")
                 st.markdown("""<div class='disclaimer-box'>⚠️ <b>หมายเหตุ:</b> ข้อมูลนี้มาจากการวิเคราะห์ทางเทคนิคด้วยระบบ AI (Hybrid Logic) เพื่อประกอบการตัดสินใจเท่านั้น <br>ผู้ใช้งานควรศึกษาก่อนการลงทุน ผู้พัฒนาไม่รับผิดชอบต่อความเสียหายใดๆ ที่เกิดขึ้นจากการนำข้อมูลนี้ไปใช้</div>""", unsafe_allow_html=True)
@@ -544,7 +543,6 @@ if submit_btn:
                 rsi_interp_str = get_rsi_interpretation(rsi)
                 macd_interp_str = "🟢 Bullish" if macd_val > macd_signal else "🔴 Bearish"
                 
-                # ✅ UPDATE: เรียกใช้ display_learning_section (เวอร์ชั่นอัปเกรดแล้ว)
                 display_learning_section(rsi, rsi_interp_str, macd_val, macd_signal, macd_interp_str, adx_val, price, ema200, bb_upper, bb_lower)
             else:
                 st.error("ไม่พบข้อมูลหุ้น หรือ ข้อมูลไม่เพียงพอสำหรับคำนวณ Indicator (ต้องมีมากกว่า 200 แท่งเทียน)")
