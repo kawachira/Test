@@ -9,6 +9,10 @@ from datetime import datetime
 # --- 1. ตั้งค่าหน้าเว็บ ---
 st.set_page_config(page_title="AI Stock Master", page_icon="💎", layout="wide")
 
+# --- Initialize Session State for History ---
+if 'history_log' not in st.session_state:
+    st.session_state['history_log'] = []
+
 # --- 2. CSS ปรับแต่ง (คงเดิม 100%) ---
 st.markdown("""
     <style>
@@ -233,33 +237,24 @@ def analyze_volume(row, vol_ma):
     elif vol < vol_ma * 0.7: return "Low Volume", "red"
     else: return "Normal Volume", "gray"
 
-# --- 7. AI Decision Engine (Conservative Logic + Situation Insight) ---
+# --- 7. AI Decision Engine ---
 def ai_hybrid_analysis(price, ema20, ema50, ema200, rsi, macd_val, macd_sig, adx, bb_up, bb_low, 
                        vol_status, mtf_trend, atr_val, mtf_ema200_val):
     score = 0
     bullish_factors = [] 
     bearish_factors = []
     
-    # 🌟 Situation Insight Logic (เพิ่มกรณี Breakout / ทะลุแนวต้าน)
+    # 🌟 Situation Insight
     situation_insight = ""
     if not np.isnan(ema20) and not np.isnan(ema50) and not np.isnan(ema200):
-        # 1. Bearish / Lose Support
         if price < ema20 and price > ema50 and price > ema200:
             situation_insight = f"⚠️ **ระวัง:** ราคาหลุดแนวรับ EMA 20 ({ema20:.2f}) ลงมาแล้ว! เส้นนี้เปลี่ยนเป็น **'แนวต้าน'** ทันที ควรรอให้ราคากลับไปยืนเหนือได้ก่อน"
-        
-        # 2. Bullish Breakout / Trend Following
         elif price > ema20 and price > ema200:
             situation_insight = f"✅ **สถานการณ์ดี:** ราคายืนเหนือแนวรับสั้น EMA 20 ({ema20:.2f}) ได้อย่างมั่นคง (แนวต้านกลายเป็นแนวรับ) เป็นสัญญาณขาขึ้นที่แข็งแกร่ง"
-        
-        # 3. Rebound / Reclaim Resistance (เพิ่มตามคำขอ) 🔥
         elif price > ema20 and price < ema50:
              situation_insight = f"🚀 **Rebound (ทะลุแนวต้านสั้น):** ราคาทะลุแนวต้าน EMA 20 ({ema20:.2f}) ขึ้นมาได้แล้ว! ตอนนี้ EMA 20 เปลี่ยนเป็น **'แนวรับ'** เป้าหมายถัดไปคือทดสอบ EMA 50 ({ema50:.2f})"
-
-        # 4. Deep Pullback
         elif price < ema50 and price > ema200:
             situation_insight = f"📉 **Deep Pullback:** ราคาย่อตัวลึกต่ำกว่า EMA 50 เข้าหาฐานใหญ่ EMA 200 ({ema200:.2f}) เป็นจุดวัดใจ ถ้ามีแรงซื้อกลับโซนนี้จะคุ้มค่าเสี่ยง"
-        
-        # 5. Full Bearish
         elif price < ema200:
             situation_insight = f"⛔ **Bearish:** ราคาอยู่ใต้เส้น EMA 200 ({ema200:.2f}) ซึ่งเป็นกำแพงหนาของขาลง การเด้งขึ้นมาชนเส้นนี้มักจะโดนเทขายใส่"
 
@@ -457,6 +452,27 @@ if submit_btn:
         ai_report = ai_hybrid_analysis(price, ema20, ema50, ema200, rsi, macd_val, macd_signal, adx_val, bb_upper, bb_lower, 
                                         vol_status, mtf_trend, atr, mtf_ema200_val)
 
+        # --- Append to Session History ---
+        # Format current time
+        current_time = datetime.now().strftime("%H:%M:%S")
+        
+        # Prepare Log Entry
+        log_entry = {
+            "เวลา": current_time,
+            "หุ้น": symbol_input,
+            "ราคา": f"{price:.2f}",
+            "Score": f"{ai_report['status_color'].upper()}",
+            "คำแนะนำ": ai_report['banner_title'].split(':')[0],
+            "Action": ai_report['strategy']
+        }
+        
+        # Add to session state (Insert at top)
+        st.session_state['history_log'].insert(0, log_entry)
+        
+        # Keep only last 10 entries to avoid memory bloat
+        if len(st.session_state['history_log']) > 10:
+            st.session_state['history_log'] = st.session_state['history_log'][:10]
+
         # --- DISPLAY ---
         logo_url = f"https://financialmodelingprep.com/image-stock/{symbol_input}.png"
         fallback_url = "https://cdn-icons-png.flaticon.com/512/720/720453.png"
@@ -618,7 +634,6 @@ if submit_btn:
                 for v, d in valid_resistances[:2]: st.write(f"- **{v:.2f}** : {d}")
             else: st.write("- ราคาทำ All Time Low")
 
-            # 🌟 MOVED HERE: Situation Insight (ย้ายมาต่อท้ายแนวรับแนวต้าน)
             if ai_report['situation_insight']:
                 st.write("") # Spacer
                 with st.expander("💡 อ่านสถานการณ์กราฟ (Click to Read)", expanded=True):
@@ -681,6 +696,16 @@ if submit_btn:
 
         st.write("")
         st.markdown("""<div class='disclaimer-box'>⚠️ <b>หมายเหตุ:</b> ข้อมูลนี้มาจากการวิเคราะห์ทางเทคนิคด้วยระบบ AI (Hybrid Logic) เพื่อประกอบการตัดสินใจเท่านั้น <br>ผู้ใช้งานควรศึกษาก่อนการลงทุน ผู้พัฒนาไม่รับผิดชอบต่อความเสียหายใดๆ ที่เกิดขึ้นจากการนำข้อมูลนี้ไปใช้</div>""", unsafe_allow_html=True)
+        st.divider()
+        
+        # --- NEW: History Log Section ---
+        st.subheader("📜 ประวัติการวิเคราะห์ในครั้งนี้ (Session History)")
+        if st.session_state['history_log']:
+            hist_df = pd.DataFrame(st.session_state['history_log'])
+            st.dataframe(hist_df, use_container_width=True, hide_index=True)
+        else:
+            st.info("ยังไม่มีประวัติการวิเคราะห์ กดปุ่ม 'วิเคราะห์ทันที' เพื่อเริ่มใช้งาน")
+        
         st.divider()
         
         rsi_interp_str = get_rsi_interpretation(rsi)
