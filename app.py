@@ -9,7 +9,7 @@ from datetime import datetime
 # --- 1. ตั้งค่าหน้าเว็บ ---
 st.set_page_config(page_title="AI Stock Master", page_icon="💎", layout="wide")
 
-# --- 2. CSS ปรับแต่ง (UI สวยงาม - คงเดิม 100%) ---
+# --- 2. CSS ปรับแต่ง (คงเดิม 100%) ---
 st.markdown("""
     <style>
     body { overflow-x: hidden; }
@@ -35,7 +35,7 @@ st.markdown("""
     """, unsafe_allow_html=True)
 
 # --- 3. ส่วนหัวข้อ ---
-st.markdown("<h1>💎 Ai<br><span style='font-size: 1.5rem; opacity: 0.7;'>ระบบวิเคราะห์หุ้นอัจฉริยะ (Hybrid Sniper)🚀</span></h1>", unsafe_allow_html=True)
+st.markdown("<h1>💎 Ai<br><span style='font-size: 1.5rem; opacity: 0.7;'>ระบบวิเคราะห์หุ้นอัจฉริยะ (Hybrid Sniper)🪐</span></h1>", unsafe_allow_html=True)
 
 # --- Form ค้นหา ---
 col_space1, col_form, col_space2 = st.columns([1, 2, 1])
@@ -164,7 +164,7 @@ def display_learning_section(rsi, rsi_interp, macd_val, macd_signal, macd_interp
         st.markdown(f"#### 4. Bollinger Bands (BB)\n* **Upper:** `{bb_upper:.2f}` | **Lower:** `{bb_lower:.2f}`")
         st.markdown("* **คืออะไร?:** กรอบการแกว่งตัวของราคาเปรียบเหมือนขอบถนน ถ้าราคาทะลุออกไปมักจะเด้งกลับเข้ามา")
 
-def filter_levels(levels, threshold_pct=0.025):
+def filter_levels(levels, threshold_pct=0.025): 
     selected = []
     for val, label in levels:
         if np.isnan(val): continue
@@ -184,44 +184,35 @@ def filter_levels(levels, threshold_pct=0.025):
             if diff > threshold_pct: selected.append((val, label))
     return selected
 
-# --- 5. Data Fetching (Hybrid & Safer) 🛡️ ---
-# ✅ FIX 2: ปรับ TTL เป็น 60 วินาที เพื่อความเสถียรเมื่อคนใช้เยอะ
+# --- 5. Data Fetching (Hybrid & Safer) ---
 @st.cache_data(ttl=60, show_spinner=False)
 def get_data_hybrid(symbol, interval, mtf_interval):
     try:
         ticker = yf.Ticker(symbol)
         
-        # Period Selection
         if interval == "1wk": period_val = "10y"
         elif interval == "1d": period_val = "5y"
         else: period_val = "730d"
 
-        # 1. ดึงกราฟราคา (History) - ส่วนนี้เร็วและเสถียร
         df = ticker.history(period=period_val, interval=interval)
         df_mtf = ticker.history(period="10y", interval=mtf_interval)
         
-        # 2. ✅ FIX 1: Hybrid Fetching (Safe Info Retrieval)
-        # พยายามดึง info (P/E, ชื่อ) แต่ถ้าพังให้ใช้ Fallback
         try:
-            raw_info = ticker.info # ส่วนที่มักจะช้าหรือ Error
+            raw_info = ticker.info 
         except:
-            raw_info = {} # ถ้าดึงไม่ได้ ให้เป็น dict ว่างไว้ก่อน กันแอปพัง
+            raw_info = {} 
 
-        # สร้าง stock_info แบบปลอดภัย (Safe Mapping)
-        # ถ้าไม่มีใน raw_info ให้พยายามหาจาก fast_info หรือ df
         stock_info = {
             'longName': raw_info.get('longName', symbol),
-            'marketState': raw_info.get('marketState', 'REGULAR'), # Default Regular
+            'marketState': raw_info.get('marketState', 'REGULAR'), 
             'trailingPE': raw_info.get('trailingPE', None),
             'sector': raw_info.get('sector', 'Unknown'),
-            # ราคาพวกนี้เอาจาก df ล่าสุดแม่นยำกว่า info ที่อาจดีเลย์
             'regularMarketPrice': df['Close'].iloc[-1] if not df.empty else None,
             'regularMarketChange': (df['Close'].iloc[-1] - df['Close'].iloc[-2]) if len(df) > 1 else 0,
             'regularMarketChangePercent': ((df['Close'].iloc[-1] - df['Close'].iloc[-2]) / df['Close'].iloc[-2]) if len(df) > 1 else 0,
             'dayHigh': df['High'].iloc[-1] if not df.empty else None,
             'dayLow': df['Low'].iloc[-1] if not df.empty else None,
             'regularMarketOpen': df['Open'].iloc[-1] if not df.empty else None,
-            # Pre/Post อาจต้องพึ่ง info หรือ fast_info (ถ้า info พัง ส่วนนี้อาจหาย แต่แอปไม่ล่ม)
             'preMarketPrice': raw_info.get('preMarketPrice'),
             'preMarketChange': raw_info.get('preMarketChange'),
             'preMarketChangePercent': raw_info.get('preMarketChangePercent'),
@@ -232,7 +223,6 @@ def get_data_hybrid(symbol, interval, mtf_interval):
 
         return df, stock_info, df_mtf
     except Exception as e:
-        # ถ้าพังพินาศจริงๆ ให้ return None
         return None, None, None
 
 # --- 6. Analysis Logic ---
@@ -243,13 +233,29 @@ def analyze_volume(row, vol_ma):
     elif vol < vol_ma * 0.7: return "Low Volume", "red"
     else: return "Normal Volume", "gray"
 
-# --- 7. AI Decision Engine (Conservative Logic) ---
+# --- 7. AI Decision Engine (Conservative Logic + Situation Insight) ---
 def ai_hybrid_analysis(price, ema20, ema50, ema200, rsi, macd_val, macd_sig, adx, bb_up, bb_low, 
                        vol_status, mtf_trend, atr_val, mtf_ema200_val):
     score = 0
     bullish_factors = [] 
     bearish_factors = []
     
+    # 🌟 NEW: Situation Insight (วิเคราะห์สถานการณ์หน้างาน)
+    situation_insight = ""
+    if not np.isnan(ema20) and not np.isnan(ema50):
+        # กรณี RKLB (หลุด EMA 20 แต่ยังอยู่เหนือ EMA 50)
+        if price < ema20 and price > ema50 and price > ema200:
+            situation_insight = f"⚠️ **ระวัง:** ราคาหลุดแนวรับ EMA 20 ({ema20:.2f}) ลงมาแล้ว! ตอนนี้เส้นนี้เปลี่ยนหน้าที่เป็น **'แนวต้าน'** ทันที การเข้าซื้อตรงนี้มีความเสี่ยง ควรรอให้ราคากลับไปยืนเหนือ {ema20:.2f} ให้ได้ก่อนเพื่อยืนยันการกลับตัว หรือรอรับลึกที่ EMA 50 ({ema50:.2f})"
+        # กรณียืนเหนือ EMA 20 (Strong)
+        elif price > ema20 and price > ema200:
+            situation_insight = f"✅ **สถานการณ์ดี:** ราคายืนเหนือแนวรับสั้น EMA 20 ({ema20:.2f}) ได้อย่างมั่นคง เป็นสัญญาณของแนวโน้มขาขึ้นที่แข็งแกร่ง (Trend Following)"
+        # กรณี Deep Dip (ต่ำกว่า EMA 50 แต่ยัง Bullish ระยะยาว)
+        elif price < ema50 and price > ema200:
+            situation_insight = f"📉 **Deep Pullback:** ราคาย่อตัวลึกต่ำกว่า EMA 50 เข้าหาฐานใหญ่ EMA 200 ({ema200:.2f}) เป็นจุดวัดใจสำคัญ ถ้ามีแท่งเทียนกลับตัว (Reversal Candle) โซนนี้จะเป็นจุด Risk/Reward คุ้มค่า"
+        # กรณีขาลง (Bearish)
+        elif price < ema200:
+            situation_insight = f"⛔ **Bearish:** ราคาอยู่ใต้เส้น EMA 200 ({ema200:.2f}) ซึ่งเป็นแนวต้านหลักของเทรนด์ การเด้งขึ้นมาชนเส้นนี้มักจะโดนเทขายใส่ (Sell on Rally)"
+
     # 1. Trend Analysis
     if not np.isnan(ema200):
         if price > ema200:
@@ -299,10 +305,9 @@ def ai_hybrid_analysis(price, ema20, ema50, ema200, rsi, macd_val, macd_sig, adx
     elif "Low Volume" in vol_status:
         bearish_factors.append("วอลุ่มเบาบาง (ตลาดขาดความสนใจ)")
 
-    # 5. RSI (Conservative Logic - ✅ คงไว้ตามคำขอ)
+    # 5. RSI (Conservative Logic)
     if not np.isnan(rsi):
         if rsi > 70:
-            # ยังคงหักคะแนน/เตือน เพื่อป้องกันการไล่ราคา
             bearish_factors.append(f"RSI (Day) สูงระดับ {rsi:.0f} (Overbought) ระวังแรงเทขายทำกำไร")
         elif rsi < 30:
             bullish_factors.append(f"RSI (Day) ต่ำระดับ {rsi:.0f} (Oversold) ราคาเริ่มถูก อาจมีเด้งสั้น")
@@ -376,7 +381,8 @@ def ai_hybrid_analysis(price, ema20, ema50, ema200, rsi, macd_val, macd_sig, adx
         "bearish_factors": bearish_factors,
         "sl": sl_val,
         "tp": tp_val,
-        "holder_advice": holder_advice
+        "holder_advice": holder_advice,
+        "situation_insight": situation_insight # ส่งค่ากลับไปแสดงผล
     }
 
 # --- 8. Display Execution ---
@@ -550,13 +556,11 @@ if submit_btn:
             e20_s = f"{ema20:.2f}" if not np.isnan(ema20) else "N/A"
             e200_s = f"{ema200:.2f}" if not np.isnan(ema200) else "N/A"
             
-            # --- ✅ DISPLAY PERCENTAGE HERE ---
             if not np.isnan(atr) and price > 0:
                 atr_pct = (atr / price) * 100
                 atr_s = f"{atr:.2f} ({atr_pct:.1f}%)"
             else:
                 atr_s = "N/A"
-            # --------------------------------
             
             macd_s = f"{macd_val:.3f}" if not np.isnan(macd_val) else "N/A"
             
@@ -613,6 +617,11 @@ if submit_btn:
             with st.container():
                 st.info(f"{exp_adx}")
                 st.info(f"{exp_macd}")
+
+            # 🌟 NEW: ส่วนแสดงผล Situation Insight (คลิกอ่าน)
+            if ai_report['situation_insight']:
+                with st.expander("💡 อ่านสถานการณ์กราฟ (Click to Read)", expanded=True):
+                    st.warning(ai_report['situation_insight'])
 
             st.subheader("🤖 AI STRATEGY (บทสรุป)")
             color_map = {
