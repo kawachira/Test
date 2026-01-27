@@ -164,7 +164,7 @@ def display_learning_section(rsi, rsi_interp, macd_val, macd_signal, macd_interp
         st.markdown(f"#### 4. Bollinger Bands (BB)\n* **Upper:** `{bb_upper:.2f}` | **Lower:** `{bb_lower:.2f}`")
         st.markdown("* **คืออะไร?:** กรอบการแกว่งตัวของราคาเปรียบเหมือนขอบถนน ถ้าราคาทะลุออกไปมักจะเด้งกลับเข้ามา")
 
-def filter_levels(levels, threshold_pct=0.025): 
+def filter_levels(levels, threshold_pct=0.025):
     selected = []
     for val, label in levels:
         if np.isnan(val): continue
@@ -233,26 +233,22 @@ def analyze_volume(row, vol_ma):
     elif vol < vol_ma * 0.7: return "Low Volume", "red"
     else: return "Normal Volume", "gray"
 
-# --- 7. AI Decision Engine (Conservative Logic + Situation Insight) ---
+# --- 7. AI Decision Engine ---
 def ai_hybrid_analysis(price, ema20, ema50, ema200, rsi, macd_val, macd_sig, adx, bb_up, bb_low, 
                        vol_status, mtf_trend, atr_val, mtf_ema200_val):
     score = 0
     bullish_factors = [] 
     bearish_factors = []
     
-    # 🌟 NEW: Situation Insight (วิเคราะห์สถานการณ์หน้างาน)
+    # 🌟 Situation Insight (ข้อความที่จะเอาไปแปะใต้แนวรับแนวต้าน)
     situation_insight = ""
     if not np.isnan(ema20) and not np.isnan(ema50):
-        # กรณี RKLB (หลุด EMA 20 แต่ยังอยู่เหนือ EMA 50)
         if price < ema20 and price > ema50 and price > ema200:
             situation_insight = f"⚠️ **ระวัง:** ราคาหลุดแนวรับ EMA 20 ({ema20:.2f}) ลงมาแล้ว! ตอนนี้เส้นนี้เปลี่ยนหน้าที่เป็น **'แนวต้าน'** ทันที การเข้าซื้อตรงนี้มีความเสี่ยง ควรรอให้ราคากลับไปยืนเหนือ {ema20:.2f} ให้ได้ก่อนเพื่อยืนยันการกลับตัว หรือรอรับลึกที่ EMA 50 ({ema50:.2f})"
-        # กรณียืนเหนือ EMA 20 (Strong)
         elif price > ema20 and price > ema200:
             situation_insight = f"✅ **สถานการณ์ดี:** ราคายืนเหนือแนวรับสั้น EMA 20 ({ema20:.2f}) ได้อย่างมั่นคง เป็นสัญญาณของแนวโน้มขาขึ้นที่แข็งแกร่ง (Trend Following)"
-        # กรณี Deep Dip (ต่ำกว่า EMA 50 แต่ยัง Bullish ระยะยาว)
         elif price < ema50 and price > ema200:
             situation_insight = f"📉 **Deep Pullback:** ราคาย่อตัวลึกต่ำกว่า EMA 50 เข้าหาฐานใหญ่ EMA 200 ({ema200:.2f}) เป็นจุดวัดใจสำคัญ ถ้ามีแท่งเทียนกลับตัว (Reversal Candle) โซนนี้จะเป็นจุด Risk/Reward คุ้มค่า"
-        # กรณีขาลง (Bearish)
         elif price < ema200:
             situation_insight = f"⛔ **Bearish:** ราคาอยู่ใต้เส้น EMA 200 ({ema200:.2f}) ซึ่งเป็นแนวต้านหลักของเทรนด์ การเด้งขึ้นมาชนเส้นนี้มักจะโดนเทขายใส่ (Sell on Rally)"
 
@@ -305,7 +301,7 @@ def ai_hybrid_analysis(price, ema20, ema50, ema200, rsi, macd_val, macd_sig, adx
     elif "Low Volume" in vol_status:
         bearish_factors.append("วอลุ่มเบาบาง (ตลาดขาดความสนใจ)")
 
-    # 5. RSI (Conservative Logic)
+    # 5. RSI
     if not np.isnan(rsi):
         if rsi > 70:
             bearish_factors.append(f"RSI (Day) สูงระดับ {rsi:.0f} (Overbought) ระวังแรงเทขายทำกำไร")
@@ -382,7 +378,7 @@ def ai_hybrid_analysis(price, ema20, ema50, ema200, rsi, macd_val, macd_sig, adx
         "sl": sl_val,
         "tp": tp_val,
         "holder_advice": holder_advice,
-        "situation_insight": situation_insight # ส่งค่ากลับไปแสดงผล
+        "situation_insight": situation_insight
     }
 
 # --- 8. Display Execution ---
@@ -488,10 +484,10 @@ if submit_btn:
                     ohlc_html = f"""<div style="font-size: 12px; font-weight: 600; margin-bottom: 5px; font-family: 'Source Sans Pro', sans-serif; white-space: nowrap; overflow-x: auto;"><span style="margin-right: 5px; opacity: 0.7;">O</span><span style="color: {val_color}; margin-right: 12px;">{d_open:.2f}</span><span style="margin-right: 5px; opacity: 0.7;">H</span><span style="color: {val_color}; margin-right: 12px;">{d_high:.2f}</span><span style="margin-right: 5px; opacity: 0.7;">L</span><span style="color: {val_color}; margin-right: 12px;">{d_low:.2f}</span><span style="margin-right: 5px; opacity: 0.7;">C</span><span style="color: {val_color};">{d_close:.2f}</span></div>"""
             pre_post_html = ""
             if info.get('preMarketPrice') and info.get('preMarketChange'):
-                p = info['preMarketPrice']; c = info['preMarketChange']; prev_p = p - c; pct = (c / prev_p) * 100 if prev_p != 0 else 0
+                p = info.get('preMarketPrice'); c = info.get('preMarketChange'); prev_p = p - c; pct = (c / prev_p) * 100 if prev_p != 0 else 0
                 pre_post_html += f'<div style="margin-bottom: 6px; font-size: 12px;">☀️ Pre: <b>{p:.2f}</b> {make_pill(c, pct)}</div>'
             if info.get('postMarketPrice') and info.get('postMarketChange'):
-                    p = info['postMarketPrice']; c = info['postMarketChange']; prev_p = p - c; pct = (c / prev_p) * 100 if prev_p != 0 else 0
+                    p = info.get('postMarketPrice'); c = info.get('postMarketChange'); prev_p = p - c; pct = (c / prev_p) * 100 if prev_p != 0 else 0
                     pre_post_html += f'<div style="margin-bottom: 6px; font-size: 12px;">🌙 Post: <b>{p:.2f}</b> {make_pill(c, pct)}</div>'
             if ohlc_html or pre_post_html: st.markdown(f'<div style="margin-top: -5px; margin-bottom: 15px;">{ohlc_html}{pre_post_html}</div>', unsafe_allow_html=True)
 
@@ -611,17 +607,19 @@ if submit_btn:
                 for v, d in valid_resistances[:2]: st.write(f"- **{v:.2f}** : {d}")
             else: st.write("- ราคาทำ All Time Low")
 
+            # --- ✅ MOVED HERE: Situation Insight ---
+            if ai_report['situation_insight']:
+                st.write("") # Spacer
+                with st.expander("💡 อ่านสถานการณ์กราฟ (Click to Read)", expanded=True):
+                    st.warning(ai_report['situation_insight'])
+            # ----------------------------------------
+
         with c_ai:
             exp_adx, exp_rsi, exp_macd, exp_trend = get_detailed_explanation(adx_val, rsi, macd_val, macd_signal, price, ema200)
             st.subheader("🧐 AI Deep Analysis (ฉบับเข้าใจง่าย)")
             with st.container():
                 st.info(f"{exp_adx}")
                 st.info(f"{exp_macd}")
-
-            # 🌟 NEW: ส่วนแสดงผล Situation Insight (คลิกอ่าน)
-            if ai_report['situation_insight']:
-                with st.expander("💡 อ่านสถานการณ์กราฟ (Click to Read)", expanded=True):
-                    st.warning(ai_report['situation_insight'])
 
             st.subheader("🤖 AI STRATEGY (บทสรุป)")
             color_map = {
