@@ -2,7 +2,7 @@ import streamlit as st
 import yfinance as yf
 import pandas as pd
 import pandas_ta as ta
-import numpy as np # เพิ่ม numpy สำหรับคำนวณ
+import numpy as np
 import time
 
 # --- 1. ตั้งค่าหน้าเว็บ ---
@@ -105,7 +105,7 @@ def display_learning_section(rsi, rsi_interp, macd_val, macd_signal, macd_interp
         st.divider()
         st.markdown(f"#### 3. ADX\n* **ค่าปัจจุบัน:** `{adx_val:.2f}` -> {adx_interp}")
 
-# --- 5. Get Data (เพิ่ม ATR + Volume SMA) ---
+# --- 5. Get Data (คงเดิม) ---
 @st.cache_data(ttl=10, show_spinner=False)
 def get_data(symbol, interval):
     try:
@@ -140,7 +140,7 @@ def get_data(symbol, interval):
     except:
         return None, None
 
-# --- 6. AI Logic (อัปเกรดสมองใหม่: Volume + ATR + Scoring) 🧠 ---
+# --- 6. AI Logic (คงเดิม) ---
 def analyze_market_structure_smart(price, ema20, ema50, ema200, rsi, macd_val, macd_signal, adx_val, bb_upper, bb_lower, vol_now, vol_ma, atr_val):
     # เริ่มต้น Score System
     score = 0
@@ -175,7 +175,6 @@ def analyze_market_structure_smart(price, ema20, ema50, ema200, rsi, macd_val, m
         reasons.append("Volume เบาบาง")
 
     # 4. Volatility (ATR) 📏
-    # ใช้ ATR คำนวณความผันผวน เพื่อเตือนสติ
     atr_pct = (atr_val / price) * 100
     volatility_msg = "ความผันผวนปกติ"
     if atr_pct > 2.0: # ผันผวนสูง
@@ -261,6 +260,8 @@ if submit_btn:
                 vol_now = last['Volume']
                 vol_ma = last['Vol_SMA20'] if pd.notna(last['Vol_SMA20']) else vol_now
                 atr_val = last['ATR'] if pd.notna(last['ATR']) else 0
+                # ✅ เพิ่มการคำนวณ atr_pct ตรงนี้
+                atr_pct = (atr_val / price) * 100 if price else 0
 
                 try: macd_val, macd_signal = last['MACD_12_26_9'], last['MACDs_12_26_9']
                 except: macd_val, macd_signal = 0, 0
@@ -386,7 +387,7 @@ if submit_btn:
                 c_ema, c_ai = st.columns([1.5, 2])
                 with c_ema:
                     st.subheader("📉 Technical Indicators")
-                    # เพิ่มข้อมูล ATR และ Volume เข้าไปในกล่องนี้อย่างแนบเนียน
+                    # ✅ เพิ่ม (เปอร์เซ็นต์) ตรงนี้
                     st.markdown(f"""
                     <div style='background-color: var(--secondary-background-color); padding: 15px; border-radius: 10px; font-size: 0.95rem;'>
                         <div style='display:flex; justify-content:space-between; margin-bottom:5px; border-bottom:1px solid #ddd; font-weight:bold;'><span>Indicator</span> <span>Value</span></div>
@@ -395,7 +396,7 @@ if submit_btn:
                         <div style='display:flex; justify-content:space-between;'><span>EMA 200</span> <span>{ema200:.2f}</span></div>
                         <div style='margin-top:5px; margin-bottom:5px; border-bottom:1px solid #ddd;'></div>
                         <div style='display:flex; justify-content:space-between;'><span>MACD</span> <span style='color:{'green' if macd_val > macd_signal else 'red'}'>{macd_val:.3f}</span></div>
-                        <div style='display:flex; justify-content:space-between;'><span>ATR (Volat)</span> <span>{atr_val:.2f}</span></div>
+                        <div style='display:flex; justify-content:space-between;'><span>ATR (Volat)</span> <span>{atr_val:.2f} ({atr_pct:.1f}%)</span></div>
                         <div style='display:flex; justify-content:space-between;'><span>Volume</span> <span>{vol_now/1000:.1f}K</span></div>
                     </div>
                     """, unsafe_allow_html=True)
