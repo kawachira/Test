@@ -50,7 +50,7 @@ st.markdown("""
     """, unsafe_allow_html=True)
 
 # --- 3. Header ---
-st.markdown("<h1>💎 Ai Stock Master <br><span style='font-size: 1.2rem; opacity: 0.7;'>Hybrid Sniper + Banker's Eye 👁️</span></h1>", unsafe_allow_html=True)
+st.markdown("<h1>💎  Stock Master <br><span style='font-size: 1.2rem; opacity: 0.7;'>Hybrid Sniper + Banker's Eye 👁️</span></h1>", unsafe_allow_html=True)
 
 # --- 4. Helper Functions ---
 def arrow_html(change):
