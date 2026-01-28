@@ -8,7 +8,7 @@ import os
 from datetime import datetime
 
 # --- 1. ตั้งค่าหน้าเว็บ ---
-st.set_page_config(page_title="AI Stock Master (Ultimate)", page_icon="💎", layout="wide")
+st.set_page_config(page_title="AI Stock Master", page_icon="💎", layout="wide")
 
 # --- Initialize Session States ---
 if 'history_log' not in st.session_state: st.session_state['history_log'] = []
