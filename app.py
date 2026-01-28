@@ -35,6 +35,28 @@ st.markdown("""
         text-align: center; font-weight: 500;
         box-shadow: 0 4px 6px rgba(0,0,0,0.05);
     }
+    /* CSS สำหรับส่วนแสดงผลใหม่ (X-Ray Box) */
+    .xray-box {
+        background-color: #f0f9ff;
+        border: 1px solid #bae6fd;
+        border-radius: 10px;
+        padding: 15px;
+        margin-bottom: 20px;
+    }
+    .xray-title {
+        font-weight: bold;
+        color: #0369a1;
+        font-size: 1.1rem;
+        margin-bottom: 10px;
+        border-bottom: 1px solid #e0f2fe;
+        padding-bottom: 5px;
+    }
+    .xray-item {
+        display: flex;
+        justify-content: space-between;
+        margin-bottom: 8px;
+        font-size: 0.95rem;
+    }
     </style>
     """, unsafe_allow_html=True)
 
@@ -59,35 +81,49 @@ with col_form:
         st.markdown("---")
         submit_btn = st.form_submit_button("🚀 วิเคราะห์ทันที")
 
-# --- 4. Helper Functions (เพิ่ม Logic อ่านแท่งเทียนตรงนี้) ---
+# --- 4. Helper Functions ---
 
 def analyze_candlestick(open_price, high, low, close):
-    """ฟังก์ชันวิเคราะห์แท่งเทียนรายวัน (Smart Addition)"""
+    """ฟังก์ชันวิเคราะห์แท่งเทียนรายวัน (ละเอียด)"""
     body = abs(close - open_price)
     wick_upper = high - max(close, open_price)
     wick_lower = min(close, open_price) - low
     total_range = high - low
     
-    if total_range == 0: return "Doji (N/A)"
+    # Color logic
+    color = "🟢 เขียว (Buying)" if close >= open_price else "🔴 แดง (Selling)"
+    
+    if total_range == 0: return "Doji (N/A)", color, "N/A"
+
+    # Pattern Logic
+    pattern_name = "Normal Candle (ปกติ)"
+    detail = "แรงซื้อขายสมดุล"
 
     # 1. Hammer / Pinbar (กลับตัวขึ้น)
     if wick_lower > (body * 2) and wick_upper < body:
-        return "Hammer/Pinbar (แรงซื้อสวนกลับดันราคาขึ้น)"
+        pattern_name = "Hammer/Pinbar (ค้อน)"
+        detail = "มีการปฏิเสธราคาต่ำ (แรงซื้อสวนกลับดันราคาขึ้น)"
     
     # 2. Shooting Star / Inverted Hammer (กลับตัวลง)
-    if wick_upper > (body * 2) and wick_lower < body:
-        return "Shooting Star (โดนตบหัวทิ่ม/แรงขายกดดัน)"
+    elif wick_upper > (body * 2) and wick_lower < body:
+        pattern_name = "Shooting Star (ดาวตก)"
+        detail = "มีการปฏิเสธราคาสูง (โดนตบหัวทิ่ม/แรงขายกดดัน)"
     
     # 3. Big Body (แรงซื้อ/ขาย แข็งแกร่ง)
-    if body > (total_range * 0.8):
-        if close > open_price: return "Big Bullish Candle (แท่งเขียวตัน/แรงซื้อคุมตลาด)"
-        else: return "Big Bearish Candle (แท่งแดงตัน/แรงขายคุมตลาด)"
+    elif body > (total_range * 0.8):
+        if close > open_price: 
+            pattern_name = "Big Bullish Candle (แท่งเขียวตัน)"
+            detail = "แรงซื้อคุมตลาดเบ็ดเสร็จ (Strong Momentum)"
+        else: 
+            pattern_name = "Big Bearish Candle (แท่งแดงตัน)"
+            detail = "แรงขายคุมตลาดเบ็ดเสร็จ (Panic Sell)"
     
     # 4. Doji (ลังเล)
-    if body < (total_range * 0.1):
-        return "Doji (ตลาดลังเล/รอเลือกทาง)"
+    elif body < (total_range * 0.1):
+        pattern_name = "Doji (โดจิ)"
+        detail = "ตลาดเกิดความลังเล (Indecision) รอเลือกทาง"
         
-    return "Normal Candle (ปกติ)"
+    return pattern_name, color, detail
 
 def arrow_html(change):
     if change is None: return ""
@@ -267,19 +303,17 @@ def analyze_volume(row, vol_ma):
     else: return "Normal Volume", "gray"
 
 # --- 7. AI Decision Engine (SMART UPGRADE) ---
-# เพิ่ม Logic ตรวจจับ Squeeze, Candlestick Pattern และ ADX Filter
-
 def ai_hybrid_analysis(price, ema20, ema50, ema200, rsi, macd_val, macd_sig, adx, bb_up, bb_low, 
                        vol_status, mtf_trend, atr_val, mtf_ema200_val,
-                       open_price, high, low, close): # <--- รับค่า OHLC เพิ่ม
+                       open_price, high, low, close): 
     score = 0
     bullish_factors = [] 
     bearish_factors = []
     
     # --- 0. Candlestick & Volatility Insight (New Logic) ---
-    candle_pattern = analyze_candlestick(open_price, high, low, close)
+    candle_pattern, candle_color, candle_detail = analyze_candlestick(open_price, high, low, close)
     bb_width = ((bb_up - bb_low) / ema20) * 100 if not np.isnan(ema20) else 0
-    is_squeeze = bb_width < 5.0 # ถ้ากรอบ BB แคบกว่า 5% ถือว่า Squeeze (อัดอั้น)
+    is_squeeze = bb_width < 5.0 
 
     situation_insight = ""
     
@@ -296,7 +330,7 @@ def ai_hybrid_analysis(price, ema20, ema50, ema200, rsi, macd_val, macd_sig, adx
         elif price < ema200:
             situation_insight = f"⛔ **Bearish:** ราคาอยู่ใต้เส้น EMA 200 ({ema200:.2f}) เทรนด์หลักยังเป็นขาลง"
 
-    # เพิ่ม Insight จากแท่งเทียน (New)
+    # เพิ่ม Insight จากแท่งเทียน
     if "Hammer" in candle_pattern:
         bullish_factors.append(f"เกิดแท่งเทียน **{candle_pattern}** (สัญญาณกลับตัวระยะสั้น)")
     elif "Shooting Star" in candle_pattern:
@@ -324,10 +358,9 @@ def ai_hybrid_analysis(price, ema20, ema50, ema200, rsi, macd_val, macd_sig, adx
     else:
         bullish_factors.append("ข้อมูลกราฟไม่เพียงพอสำหรับ EMA 200")
 
-    # --- 2. Momentum & ADX Filter (New Logic) ---
-    # ถ้า ADX ต่ำกว่า 20 แสดงว่าตลาด Sideway อินดิเคเตอร์ Trend จะเชื่อถือไม่ค่อยได้
+    # --- 2. Momentum & ADX Filter ---
     if not np.isnan(adx) and adx < 20:
-        score = 0 # Reset Score ให้เป็นกลาง เพราะตลาดไม่มีเทรนด์
+        score = 0 
         situation_insight = "😴 **Sideway Market:** ADX ต่ำกว่า 20 ตลาดแกว่งตัวออกข้าง ไร้ทิศทางชัดเจน (ระบบลดน้ำหนัก Trend ลง)"
         bearish_factors.append("ADX อ่อนแรง (Trend Strength Weak) ระวัง False Signal")
 
@@ -348,24 +381,28 @@ def ai_hybrid_analysis(price, ema20, ema50, ema200, rsi, macd_val, macd_sig, adx
         score -= 2
         bearish_factors.append(f"ภาพใหญ่ ({mtf_label}) อยู่ใต้ EMA 200 เป็นขาลงกดดันภาพรวม")
 
-    # --- 4. Volume & Churning Check (New Logic) ---
+    # --- 4. Volume & Churning Check ---
+    vol_quality_msg = "Normal"
     if "High Volume" in vol_status:
-        # เช็คว่า Volume เยอะแต่ราคาไม่ไปไหนหรือเปล่า (Churning)
         body_size = abs(close - open_price)
         range_size = high - low
         if range_size > 0 and (body_size / range_size) < 0.3: 
              bearish_factors.append("⚠️ **Volume Churning:** วอลุ่มสูงแต่ราคาไม่ไปไหน (ระวังแรงขายแฝง)")
-             score -= 1 # หักคะแนน
+             score -= 1 
+             vol_quality_msg = "Churning (ปั่นป่วน/ไม่ไปไหน)"
         elif price > open_price:
             score += 1
             bullish_factors.append("มีวอลุ่มซื้อเข้ามาสนับสนุนอย่างหนาแน่น")
+            vol_quality_msg = "Strong Buying (ซื้อจริง)"
         else:
             score -= 1
             bearish_factors.append("มีวอลุ่มเทขายออกมาอย่างหนาแน่น")
+            vol_quality_msg = "Panic Selling (ขายจริง)"
     elif "Low Volume" in vol_status:
         bearish_factors.append("วอลุ่มเบาบาง (ตลาดขาดความสนใจ)")
+        vol_quality_msg = "Dry / Low Interest"
 
-    # --- 5. RSI (Conservative Logic) ---
+    # --- 5. RSI ---
     if not np.isnan(rsi):
         if rsi > 70:
             bearish_factors.append(f"RSI (Day) สูงระดับ {rsi:.0f} (Overbought) ระวังแรงเทขายทำกำไร")
@@ -373,7 +410,6 @@ def ai_hybrid_analysis(price, ema20, ema50, ema200, rsi, macd_val, macd_sig, adx
             bullish_factors.append(f"RSI (Day) ต่ำระดับ {rsi:.0f} (Oversold) ราคาเริ่มถูก อาจมีเด้งสั้น")
 
     # --- Strategy Generator ---
-
     status_color = "yellow"
     banner_title = ""
     strategy_text = ""
@@ -381,34 +417,28 @@ def ai_hybrid_analysis(price, ema20, ema50, ema200, rsi, macd_val, macd_sig, adx
     holder_advice = ""
 
     e20_str = f"{ema20:,.2f}" if not np.isnan(ema20) else "N/A"
-    
-    # ปรับ SL/TP ให้ Dynamic ขึ้นตาม ATR
     sl_dist = 2.0 * atr_val if not np.isnan(atr_val) else price * 0.05
     tp_dist = 3.0 * atr_val if not np.isnan(atr_val) else price * 0.08
     sl_val = price - sl_dist
     tp_val = price + tp_dist
     sl_str = f"{sl_val:,.2f}"
     
-    # คำนวณ Upside
     upside_dist = 0
     if not np.isnan(bb_up):
         upside_dist = ((bb_up - price) / price) * 100
 
-    # Squeeze Logic Override (New Logic)
     if is_squeeze:
         context_text = f"⚡ **Volatility Squeeze:** Bollinger Bands บีบตัวแคบมาก ({bb_width:.1f}%) กราฟกำลังสะสมพลังรอระเบิดครั้งใหญ่ (Big Move Incoming)"
         banner_title = "💣 Squeeze Alert: เตรียมระเบิด"
         strategy_text = "Watch for Breakout (จับตาห้ามกระพริบ)"
         holder_advice = f"ตั้ง Alert ไว้! ถ้าราคาทะลุ **{bb_up:.2f}** ให้ Follow Buy แต่ถ้าหลุด **{bb_low:.2f}** ให้หนีทันที"
-        status_color = "orange" # เตือนให้ระวัง
+        status_color = "orange"
         
     else:
-        # Normal Scoring Logic
         if score >= 6:
             status_color = "green"
             banner_title = "🚀 Super Nova: กระทิงดุขั้นสุด"
             strategy_text = "Aggressive Buy / Let Profit Run"
-            
             if price < bb_up:
                 context_text = f"ตลาดเข้าสู่สภาวะ 'Euphoria' แรงซื้อสนับสนุนเต็มที่ **แต่ราคายังอยู่ใต้กรอบบน (BB Upper)** เหลือ Upside อีก {upside_dist:.1f}% จะชนแนวต้านสำคัญ"
                 holder_advice = f"🧐 **Watch the Wall:** ถือต่อได้เพราะเทรนด์แรง แต่ต้องจับตาดูแนวต้าน **{bb_up:.2f}** ให้ดี ถ้าชนแล้วไม่ผ่านอาจมีย่อตัวสั้นๆ"
@@ -420,12 +450,10 @@ def ai_hybrid_analysis(price, ema20, ema50, ema200, rsi, macd_val, macd_sig, adx
             status_color = "green"
             banner_title = "🐂 Strong Bullish: ขาขึ้นแข็งแกร่ง"
             strategy_text = "Strong Buy (ซื้อเพิ่ม/ถือต่อ)"
-            
             if price < bb_up:
                  context_text = f"เทรนด์หลักเป็นขาขึ้นชัดเจน โมเมนตัมบวก แต่ราคากำลังไต่ขึ้นทดสอบแนวต้าน **BB Upper ({bb_up:.2f})**"
             else:
                  context_text = "เทรนด์หลักเป็นขาขึ้นชัดเจน ราคายืนเหนือทุกแนวต้านได้ดี โมเมนตัมบวกสนับสนุนต่อเนื่อง"
-                 
             holder_advice = f"🥳 **Enjoy the ride:** ถือต่อได้อย่างสบายใจ ถ้ามีย่อตัวใกล้ EMA 20 ({e20_str}) ถือเป็นโอกาสในการเก็บเพิ่ม"
 
         elif score >= 2:
@@ -478,7 +506,13 @@ def ai_hybrid_analysis(price, ema20, ema50, ema200, rsi, macd_val, macd_sig, adx
         "sl": sl_val,
         "tp": tp_val,
         "holder_advice": holder_advice,
-        "situation_insight": situation_insight
+        "situation_insight": situation_insight,
+        "candle_pattern": candle_pattern,
+        "candle_color": candle_color,
+        "candle_detail": candle_detail,
+        "bb_width": bb_width,
+        "is_squeeze": is_squeeze,
+        "vol_quality_msg": vol_quality_msg
     }
 
 # --- 8. Display Execution ---
@@ -735,6 +769,26 @@ if submit_btn:
                     st.warning(ai_report['situation_insight'])
 
         with c_ai:
+            # --- NEW DISPLAY: Price Action X-Ray ---
+            st.subheader("🔬 Price Action X-Ray (วิเคราะห์ไส้เทียน)")
+            
+            sq_txt = "⚠️ Squeeze (อัดอั้น)" if ai_report['is_squeeze'] else "Normal (ปกติ)"
+            sq_col = "#f97316" if ai_report['is_squeeze'] else "#0369a1"
+            
+            vol_q_col = "#22c55e" if "Buying" in ai_report['vol_quality_msg'] else ("#ef4444" if "Selling" in ai_report['vol_quality_msg'] else "#6b7280")
+
+            st.markdown(f"""
+            <div class='xray-box'>
+                <div class='xray-title'>🕯️ Candlestick & Volatility</div>
+                <div class='xray-item'><span>ทรงกราฟ (Pattern):</span> <span style='font-weight:bold;'>{ai_report['candle_pattern']}</span></div>
+                <div class='xray-item'><span>สถานะ (Status):</span> <span>{ai_report['candle_color']}</span></div>
+                <div class='xray-item'><span>รายละเอียด:</span> <span style='font-style:italic;'>{ai_report['candle_detail']}</span></div>
+                <hr style='margin: 8px 0; opacity: 0.3;'>
+                <div class='xray-item'><span>ความผันผวน (BB Width):</span> <span style='color:{sq_col}; font-weight:bold;'>{sq_txt} ({ai_report['bb_width']:.2f}%)</span></div>
+                 <div class='xray-item'><span>คุณภาพ Volume:</span> <span style='color:{vol_q_col}; font-weight:bold;'>{ai_report['vol_quality_msg']}</span></div>
+            </div>
+            """, unsafe_allow_html=True)
+
             exp_adx, exp_rsi, exp_macd, exp_trend = get_detailed_explanation(adx_val, rsi, macd_val, macd_signal, price, ema200)
             st.subheader("🧐 AI Deep Analysis (ฉบับเข้าใจง่าย)")
             with st.container():
