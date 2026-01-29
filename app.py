@@ -211,25 +211,72 @@ def filter_levels(levels, threshold_pct=0.025):
             if diff > threshold_pct: selected.append((val, label))
     return selected
 
-# --- 5. Data Fetching (คงเดิม 100%) ---
+# --- 5. Data Fetching (MODIFIED TO FORCE DAILY HEADER) ---
 @st.cache_data(ttl=60, show_spinner=False)
 def get_data_hybrid(symbol, interval, mtf_interval):
     try:
         ticker = yf.Ticker(symbol)
+        
+        # 1. Main Chart Data (ใช้ Timeframe ตามที่ User เลือกเหมือนเดิม)
         if interval == "1wk": period_val = "10y"
         elif interval == "1d": period_val = "5y"
         else: period_val = "730d"
         df = ticker.history(period=period_val, interval=interval)
+        
+        # 2. MTF Data (เหมือนเดิม)
         df_mtf = ticker.history(period="10y", interval=mtf_interval)
+        
+        # 3. Stock Info & Header Data
         try: raw_info = ticker.info 
         except: raw_info = {} 
+
+        # [MODIFIED HERE] ดึงข้อมูลรายวันแยกต่างหากเพื่อใช้แสดงผลที่หัวเว็บเท่านั้น
+        df_daily_header = ticker.history(period="5d", interval="1d")
+        
+        if not df_daily_header.empty and len(df_daily_header) >= 1:
+            # ใช้ราคาปิดล่าสุดจากกราฟรายวัน
+            header_price = df_daily_header['Close'].iloc[-1]
+            # คำนวณการเปลี่ยนแปลงเทียบกับวันก่อนหน้า
+            if len(df_daily_header) >= 2:
+                header_change = header_price - df_daily_header['Close'].iloc[-2]
+                header_pct = (header_change / df_daily_header['Close'].iloc[-2])
+            else:
+                header_change = 0
+                header_pct = 0
+            
+            # ดึงค่า High/Low/Open ของวันปัจจุบันจากกราฟรายวัน
+            day_high = df_daily_header['High'].iloc[-1]
+            day_low = df_daily_header['Low'].iloc[-1]
+            day_open = df_daily_header['Open'].iloc[-1]
+        else:
+            # Fallback (กันเหนียว) ถ้าดึงรายวันไม่ได้จริงๆ ให้ใช้ค่าจาก df หลัก
+            header_price = df['Close'].iloc[-1] if not df.empty else None
+            header_change = (df['Close'].iloc[-1] - df['Close'].iloc[-2]) if len(df) > 1 else 0
+            header_pct = 0
+            day_high = df['High'].iloc[-1] if not df.empty else None
+            day_low = df['Low'].iloc[-1] if not df.empty else None
+            day_open = df['Open'].iloc[-1] if not df.empty else None
+        
         stock_info = {
-            'longName': raw_info.get('longName', symbol), 'marketState': raw_info.get('marketState', 'REGULAR'), 'trailingPE': raw_info.get('trailingPE', None), 'sector': raw_info.get('sector', 'Unknown'),
-            'regularMarketPrice': df['Close'].iloc[-1] if not df.empty else None, 'regularMarketChange': (df['Close'].iloc[-1] - df['Close'].iloc[-2]) if len(df) > 1 else 0,
-            'regularMarketChangePercent': ((df['Close'].iloc[-1] - df['Close'].iloc[-2]) / df['Close'].iloc[-2]) if len(df) > 1 else 0,
-            'dayHigh': df['High'].iloc[-1] if not df.empty else None, 'dayLow': df['Low'].iloc[-1] if not df.empty else None, 'regularMarketOpen': df['Open'].iloc[-1] if not df.empty else None,
-            'preMarketPrice': raw_info.get('preMarketPrice'), 'preMarketChange': raw_info.get('preMarketChange'), 'preMarketChangePercent': raw_info.get('preMarketChangePercent'),
-            'postMarketPrice': raw_info.get('postMarketPrice'), 'postMarketChange': raw_info.get('postMarketChange'), 'postMarketChangePercent': raw_info.get('postMarketChangePercent'),
+            'longName': raw_info.get('longName', symbol), 
+            'marketState': raw_info.get('marketState', 'REGULAR'), 
+            'trailingPE': raw_info.get('trailingPE', None), 
+            'sector': raw_info.get('sector', 'Unknown'),
+            
+            # ใช้ค่าที่คำนวณใหม่จาก df_daily_header
+            'regularMarketPrice': header_price, 
+            'regularMarketChange': header_change,
+            'regularMarketChangePercent': header_pct,
+            'dayHigh': day_high, 
+            'dayLow': day_low, 
+            'regularMarketOpen': day_open,
+            
+            'preMarketPrice': raw_info.get('preMarketPrice'), 
+            'preMarketChange': raw_info.get('preMarketChange'), 
+            'preMarketChangePercent': raw_info.get('preMarketChangePercent'),
+            'postMarketPrice': raw_info.get('postMarketPrice'), 
+            'postMarketChange': raw_info.get('postMarketChange'), 
+            'postMarketChangePercent': raw_info.get('postMarketChangePercent'),
         }
         return df, stock_info, df_mtf
     except Exception as e: return None, None, None
