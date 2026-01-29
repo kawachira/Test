@@ -61,7 +61,7 @@ st.markdown("""
     """, unsafe_allow_html=True)
 
 # --- 3. ส่วนหัวข้อ (คงเดิม 100%) ---
-st.markdown("<h1>💎 Ai<br><span style='font-size: 1.5rem; opacity: 0.7;'>ระบบวิเคราะห์หุ้นอัจฉริยะ (Hybrid Sniper)🪐</span></h1>", unsafe_allow_html=True)
+st.markdown("<h1>💎 Ai<br><span style='font-size: 1.5rem; opacity: 0.7;'>ระบบวิเคราะห์หุ้นอัจฉริยะ (Hybrid Sniper + Squeeze Predictor)🪐</span></h1>", unsafe_allow_html=True)
 
 # --- Form ค้นหา (คงเดิม 100%) ---
 col_space1, col_form, col_space2 = st.columns([1, 2, 1])
@@ -102,7 +102,6 @@ def analyze_candlestick(open_price, high, low, close):
     elif wick_upper > (body * 2) and wick_lower < body:
         pattern_name = "Shooting Star (ดาวตก)"
         detail = "มีการปฏิเสธราคาสูง (โดนตบหัวทิ่ม/แรงขายกดดัน)"
-    # [TUNED]: ปรับเกณฑ์ Big Candle เป็น 0.6 (60%) ให้จับสัญญาณได้ไวขึ้น
     elif body > (total_range * 0.6): 
         is_big = True
         if close > open_price: 
@@ -243,35 +242,49 @@ def analyze_volume(row, vol_ma):
     elif vol < vol_ma * 0.7: return "Low Volume", "red"
     else: return "Normal Volume", "gray"
 
-# --- 7. AI Decision Engine (FINE-TUNED SMART LOGIC) ---
+# --- 7. AI Decision Engine (PREDICTOR ENGINE) ---
 def ai_hybrid_analysis(price, ema20, ema50, ema200, rsi, macd_val, macd_sig, adx, bb_up, bb_low, 
                        vol_status, mtf_trend, atr_val, mtf_ema200_val,
-                       open_price, high, low, close): 
+                       open_price, high, low, close, obv_val, obv_avg): 
     
     # 1. รวบรวมข้อมูลดิบ
     candle_pattern, candle_color, candle_detail, is_big_candle = analyze_candlestick(open_price, high, low, close)
     
     bb_width = ((bb_up - bb_low) / ema20) * 100 if not np.isnan(ema20) else 0
-    # [TUNED]: ปรับ Squeeze Threshold เป็น 8.0% ให้เหมาะกับหุ้นรายตัว
     is_squeeze = bb_width < 8.0 
     
+    # OBV Analysis
+    obv_status = "Neutral"
+    obv_insight_msg = "Volume ปกติ"
+    obv_is_bullish = False
+    obv_is_bearish = False
+    
+    if not np.isnan(obv_val) and not np.isnan(obv_avg):
+        if obv_val > obv_avg:
+            obv_status = "Accumulation (เก็บของ)"
+            obv_insight_msg = "OBV ชี้ขึ้น (รายใหญ่สะสม)"
+            obv_is_bullish = True
+        else:
+            obv_status = "Distribution (รินขาย)"
+            obv_insight_msg = "OBV ชี้ลง (รายใหญ่เทขาย)"
+            obv_is_bearish = True
+
     score = 0
     bullish_factors = [] 
     bearish_factors = []
     
-    # --- [TUNED]: Quiet Uptrend Structure Check ---
+    # --- Trend Structure Check ---
     is_uptrend_structure = False
     if not np.isnan(ema20) and not np.isnan(ema50):
-        # ราคายืนเหนือ EMA 20 และ 50 (ไม่ต้องรอตัด)
         if price > ema20 and price > ema50:
-            # [ADDED SAFETY]: ต้องยืนเหนือ EMA 200 ด้วย เพื่อกรองขาลงที่เด้งหลอก
             if not np.isnan(ema200) and price > ema200:
                 is_uptrend_structure = True
-
+    
     # 2. ให้คะแนน Trend (Base Score)
+    trend_is_up = False
     if not np.isnan(ema200):
         if price > ema200:
-            score += 2; bullish_factors.append("ราคา > EMA 200 (เทรนด์หลักขาขึ้น)")
+            score += 2; bullish_factors.append("ราคา > EMA 200 (เทรนด์หลักขาขึ้น)"); trend_is_up = True
         else:
             score -= 2; bearish_factors.append("ราคา < EMA 200 (เทรนด์หลักขาลง)")
             
@@ -288,7 +301,13 @@ def ai_hybrid_analysis(price, ema20, ema50, ema200, rsi, macd_val, macd_sig, adx
     # 3. การประมวลผลชั้นสูง (Advanced Synthesis)
     situation_insight = "ตลาดแกว่งตัวตามปกติ"
     
-    # 3.1: REALITY FIX: Quiet Uptrend & Paradox
+    # 3.1: OBV Divergence Check (Outside Squeeze)
+    if (not is_squeeze):
+        if (not np.isnan(adx) and adx < 25) and obv_is_bullish:
+             score += 1 
+             bullish_factors.append("💎 **OBV Divergence:** ราคานิ่งแต่ Volume สะสมเพิ่ม (เจ้าเก็บของ)")
+
+    # 3.2: REALITY FIX: Quiet Uptrend
     if not np.isnan(adx) and adx < 25:
         if is_uptrend_structure:
             situation_insight = "📈 **Quiet Uptrend:** ราคาไต่ระดับขึ้นยืนเหนือ EMA หลักได้มั่นคง (Low Volatility) ถือเป็นขาขึ้นที่น่าสนใจ"
@@ -305,7 +324,7 @@ def ai_hybrid_analysis(price, ema20, ema50, ema200, rsi, macd_val, macd_sig, adx
         else:
             score = 0; situation_insight = "😴 **Sideway Market:** ADX ต่ำและไม่มีแรงซื้อขายที่มีนัยสำคัญ ตลาดรอเลือกทาง"
 
-    # 3.2: Reversal & Pullback
+    # 3.3: Reversal & Pullback
     elif score < 0 and "Hammer" in candle_pattern and rsi < 35:
         score += 2; situation_insight = "↩️ **Potential Reversal:** เทรนด์หลักลง แต่เกิดแท่งเทียนกลับตัว (Hammer) ในโซน Oversold"
         bullish_factors.append("แพทเทิร์นกลับตัว (Hammer) ในโซน Oversold")
@@ -314,10 +333,26 @@ def ai_hybrid_analysis(price, ema20, ema50, ema200, rsi, macd_val, macd_sig, adx
         score -= 2; situation_insight = "⚠️ **Pullback Warning:** เทรนด์ขึ้น แต่เจอแรงขายกดดัน (Shooting Star) ระวังย่อตัว"
         bearish_factors.append("แพทเทิร์นกลับตัวลง (Shooting Star) ในโซน Overbought")
 
-    # 3.3: Squeeze
+    # [UPDATED]: 3.4 Squeeze Predictor (Combo Logic)
     if is_squeeze:
-        if is_big_candle: situation_insight = "💣 **Squeeze Breakout:** ระเบิดออกจากกรอบบีบตัว!"
-        else: situation_insight = "⚡ **Volatility Squeeze:** กราฟบีบตัวแน่น เตรียมเลือกทาง"
+        # เตรียมตัวแปร RSI
+        rsi_bull = rsi > 55 if not np.isnan(rsi) else False
+        rsi_bear = rsi < 45 if not np.isnan(rsi) else False
+        
+        if is_big_candle: 
+            situation_insight = "💣 **Squeeze Breakout:** ระเบิดออกจากกรอบบีบตัว!"
+        elif trend_is_up and rsi_bull and obv_is_bullish:
+            situation_insight = "🚀 **High Prob. Breakout UP:** เทรนด์ขึ้น + RSI กระทิง + เจ้าเก็บของ (โอกาสระเบิดขึ้นสูง)"
+            score += 2
+        elif (not trend_is_up) and rsi_bear and obv_is_bearish:
+            situation_insight = "🩸 **High Prob. Breakdown DOWN:** เทรนด์ลง + RSI หมี + เจ้าเทขาย (โอกาสระเบิดลงสูง)"
+            score -= 2
+        elif obv_is_bullish:
+             situation_insight = "🔋 **Squeeze Accumulation:** ราคาบีบตัว + OBV สะสม (ลุ้นระเบิดขึ้น)"
+        elif obv_is_bearish:
+             situation_insight = "🩸 **Squeeze Distribution:** ราคาบีบตัว + OBV รินขาย (ระวังระเบิดลง)"
+        else:
+             situation_insight = "⚡ **Volatility Squeeze:** กราฟบีบตัวแน่น รอเลือกทาง (สัญญาณยังก้ำกึ่ง)"
 
     # 4. Volume
     vol_msg = "Normal"
@@ -360,7 +395,8 @@ def ai_hybrid_analysis(price, ema20, ema50, ema200, rsi, macd_val, macd_sig, adx
         "status_color": status_color, "banner_title": banner_title, "strategy": strategy_text, "context": situation_insight,
         "bullish_factors": bullish_factors, "bearish_factors": bearish_factors, "sl": sl_val, "tp": tp_val, "holder_advice": holder_advice,
         "situation_insight": situation_insight, "candle_pattern": candle_pattern, "candle_color": candle_color, "candle_detail": candle_detail,
-        "bb_width": bb_width, "is_squeeze": is_squeeze, "vol_quality_msg": vol_msg
+        "bb_width": bb_width, "is_squeeze": is_squeeze, "vol_quality_msg": vol_msg,
+        "obv_insight_msg": obv_insight_msg, "obv_status": obv_status
     }
 
 # --- 8. Display Execution (คงเดิม 100% + X-Ray) ---
@@ -385,6 +421,10 @@ if submit_btn:
         else: bbl_col_name, bbu_col_name = None, None
         adx = ta.adx(df['High'], df['Low'], df['Close'], length=14); df = pd.concat([df, adx], axis=1)
         df['Vol_SMA20'] = ta.sma(df['Volume'], length=20)
+        
+        # Calculate OBV & OBV MA
+        df['OBV'] = ta.obv(df['Close'], df['Volume'])
+        df['OBV_SMA20'] = ta.sma(df['OBV'], length=20)
 
         # Last Values
         last = df.iloc[-1]
@@ -403,6 +443,10 @@ if submit_btn:
         if bbu_col_name and bbl_col_name: bb_upper, bb_lower = last[bbu_col_name], last[bbl_col_name]
         else: bb_upper, bb_lower = price * 1.05, price * 0.95
         vol_status, vol_color = analyze_volume(last, last['Vol_SMA20'])
+        
+        try: obv_val = last['OBV']; obv_avg = last['OBV_SMA20']
+        except: obv_val = np.nan; obv_avg = np.nan
+
         mtf_trend = "Sideway"; mtf_ema200_val = 0
         if df_mtf is not None and not df_mtf.empty:
             df_mtf['EMA200'] = ta.ema(df_mtf['Close'], length=200) 
@@ -414,7 +458,7 @@ if submit_btn:
         # AI Analysis
         ai_report = ai_hybrid_analysis(price, ema20, ema50, ema200, rsi, macd_val, macd_signal, adx_val, bb_upper, bb_lower, 
                                        vol_status, mtf_trend, atr, mtf_ema200_val,
-                                       open_p, high_p, low_p, close_p)
+                                       open_p, high_p, low_p, close_p, obv_val, obv_avg)
 
         # Log
         current_time = datetime.now().strftime("%H:%M:%S")
@@ -499,7 +543,21 @@ if submit_btn:
             sq_txt = "⚠️ Squeeze (อัดอั้น)" if ai_report['is_squeeze'] else "Normal (ปกติ)"
             sq_col = "#f97316" if ai_report['is_squeeze'] else "#0369a1"
             vol_q_col = "#22c55e" if "Buying" in ai_report['vol_quality_msg'] else ("#ef4444" if "Selling" in ai_report['vol_quality_msg'] else "#6b7280")
-            st.markdown(f"""<div class='xray-box'><div class='xray-title'>🕯️ Deep Insight</div><div class='xray-item'><span>ทรงกราฟ:</span> <span style='font-weight:bold;'>{ai_report['candle_pattern']}</span></div><div class='xray-item'><span>สถานะ:</span> <span>{ai_report['candle_color']}</span></div><div class='xray-item'><span>รายละเอียด:</span> <span style='font-style:italic;'>{ai_report['candle_detail']}</span></div><hr style='margin: 8px 0; opacity: 0.3;'><div class='xray-item'><span>ความผันผวน:</span> <span style='color:{sq_col}; font-weight:bold;'>{sq_txt}</span></div><div class='xray-item'><span>คุณภาพ Volume:</span> <span style='color:{vol_q_col}; font-weight:bold;'>{ai_report['vol_quality_msg']}</span></div></div>""", unsafe_allow_html=True)
+            obv_q_col = "#22c55e" if "Accumulation" in ai_report['obv_status'] else ("#ef4444" if "Distribution" in ai_report['obv_status'] else "#6b7280")
+            
+            st.markdown(f"""
+            <div class='xray-box'>
+                <div class='xray-title'>🕯️ Deep Insight</div>
+                <div class='xray-item'><span>ทรงกราฟ:</span> <span style='font-weight:bold;'>{ai_report['candle_pattern']}</span></div>
+                <div class='xray-item'><span>สถานะ:</span> <span>{ai_report['candle_color']}</span></div>
+                <div class='xray-item'><span>รายละเอียด:</span> <span style='font-style:italic;'>{ai_report['candle_detail']}</span></div>
+                <hr style='margin: 8px 0; opacity: 0.3;'>
+                <div class='xray-item'><span>ความผันผวน:</span> <span style='color:{sq_col}; font-weight:bold;'>{sq_txt}</span></div>
+                <div class='xray-item'><span>คุณภาพ Volume:</span> <span style='color:{vol_q_col}; font-weight:bold;'>{ai_report['vol_quality_msg']}</span></div>
+                <div class='xray-item'><span>🕵️‍♂️ รายใหญ่ (OBV):</span> <span style='color:{obv_q_col}; font-weight:bold;'>{ai_report['obv_insight_msg']}</span></div>
+            </div>
+            """, unsafe_allow_html=True)
+            
             st.subheader("🤖 AI STRATEGY")
             color_map = {"green": {"bg": "#dcfce7", "border": "#22c55e", "text": "#14532d"}, "red": {"bg": "#fee2e2", "border": "#ef4444", "text": "#7f1d1d"}, "orange": {"bg": "#ffedd5", "border": "#f97316", "text": "#7c2d12"}, "yellow": {"bg": "#fef9c3", "border": "#eab308", "text": "#713f12"}}
             c_theme = color_map.get(ai_report['status_color'], color_map["yellow"])
