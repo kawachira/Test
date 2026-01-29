@@ -247,7 +247,7 @@ def ai_hybrid_analysis(price, ema20, ema50, ema200, rsi, macd_val, macd_sig, adx
                        vol_status, mtf_trend, atr_val, mtf_ema200_val,
                        open_price, high, low, close, obv_val, obv_avg): 
     
-    # --- 🛡️ Data Sanitization (ป้องกัน Error จากข้อมูลเสีย/None) ---
+    # --- 🛡️ Data Sanitization (ป้องกัน Error จากข้อมูลเสีย) ---
     def safe_float(x):
         try:
             val = float(x)
@@ -255,7 +255,6 @@ def ai_hybrid_analysis(price, ema20, ema50, ema200, rsi, macd_val, macd_sig, adx
         except:
             return np.nan
 
-    # แปลงทุกตัวแปรให้เป็นตัวเลขที่ปลอดภัยก่อนเริ่มคำนวณ
     price = safe_float(price)
     ema20 = safe_float(ema20)
     ema50 = safe_float(ema50)
@@ -276,10 +275,9 @@ def ai_hybrid_analysis(price, ema20, ema50, ema200, rsi, macd_val, macd_sig, adx
     candle_pattern, candle_color, candle_detail, is_big_candle = analyze_candlestick(open_price, high, low, close)
     
     bb_width = ((bb_up - bb_low) / ema20) * 100 if not np.isnan(ema20) else 0
-    # [TUNED]: ปรับ Squeeze Threshold เป็น 8.0%
     is_squeeze = bb_width < 8.0 
     
-    # [OBV Analysis]
+    # OBV Analysis
     obv_status = "Neutral"
     obv_insight_msg = "Volume ปกติ"
     obv_is_bullish = False
@@ -330,7 +328,7 @@ def ai_hybrid_analysis(price, ema20, ema50, ema200, rsi, macd_val, macd_sig, adx
     # 3.1: OBV Divergence (Bonus Points only)
     if (not is_squeeze):
         if (not np.isnan(adx) and adx < 25) and obv_is_bullish:
-             score += 1 # บวกคะแนนช่วย แต่ไม่บังคับเปลี่ยนสี
+             score += 1 
              bullish_factors.append("💎 **OBV Divergence:** ราคานิ่งแต่ Volume สะสมเพิ่ม (สัญญาณบวก)")
 
     # 3.2: REALITY FIX: Quiet Uptrend
@@ -354,14 +352,12 @@ def ai_hybrid_analysis(price, ema20, ema50, ema200, rsi, macd_val, macd_sig, adx
     elif score < 0 and "Hammer" in candle_pattern and rsi < 35:
         score += 2; situation_insight = "↩️ **Potential Reversal:** เทรนด์หลักลง แต่เกิดแท่งเทียนกลับตัว (Hammer) ในโซน Oversold"
         bullish_factors.append("แพทเทิร์นกลับตัว (Hammer) ในโซน Oversold")
-
     elif score > 0 and "Shooting Star" in candle_pattern and rsi > 65:
         score -= 2; situation_insight = "⚠️ **Pullback Warning:** เทรนด์ขึ้น แต่เจอแรงขายกดดัน (Shooting Star) ระวังย่อตัว"
         bearish_factors.append("แพทเทิร์นกลับตัวลง (Shooting Star) ในโซน Overbought")
 
-    # [SQUEEZE PREDICTOR]: ใช้ OBV ช่วยทำนาย Squeeze (แต่ไม่บังคับทิศทาง)
+    # 3.4: Squeeze Logic
     if is_squeeze:
-        # เตรียมตัวแปร RSI
         rsi_bull = rsi > 55 if not np.isnan(rsi) else False
         rsi_bear = rsi < 45 if not np.isnan(rsi) else False
         
@@ -383,38 +379,29 @@ def ai_hybrid_analysis(price, ema20, ema50, ema200, rsi, macd_val, macd_sig, adx
     # 4. Volume
     vol_msg = "Normal"
     if "High Volume" in vol_status:
-        if price > open_price: 
-            score += 1; vol_msg = "Strong Buying (ซื้อจริง)"; bullish_factors.append("Volume เข้าสนับสนุนการขึ้น")
-        else: 
-            score -= 1; vol_msg = "Panic Selling (ขายจริง)"; bearish_factors.append("Volume ถล่มขาย")
+        if price > open_price: score += 1; vol_msg = "Strong Buying (ซื้อจริง)"; bullish_factors.append("Volume เข้าสนับสนุนการขึ้น")
+        else: score -= 1; vol_msg = "Panic Selling (ขายจริง)"; bearish_factors.append("Volume ถล่มขาย")
             
     # 5. สรุป Strategy
     status_color = "yellow"; banner_title = ""; strategy_text = ""; holder_advice = ""
-    
-    # Calculate SL/TP safely
     sl_val = price - (2 * atr_val) if not np.isnan(atr_val) else price * 0.95
     tp_val = price + (3 * atr_val) if not np.isnan(atr_val) else price * 1.05
 
     if is_squeeze and not is_big_candle:
         status_color = "orange"; banner_title = "💣 Squeeze Watch: รอระเบิด"; strategy_text = "Wait for Breakout"
         holder_advice = f"ตั้ง Alert รอ! ถ้าทะลุ {bb_up:.2f} ให้ตาม แต่ถ้าหลุด {bb_low:.2f} ให้หนี"
-    
     elif score >= 5:
         status_color = "green"; banner_title = "🚀 Super Nova: กระทิงดุ"; strategy_text = "Aggressive Buy / Let Profit Run"
         holder_advice = "กอดหุ้นแน่นๆ ตลาดเป็นใจทุกอย่าง (Trend + Momentum + Volume)"
-        
     elif score >= 3:
         status_color = "green"; banner_title = "🐂 Bullish: ขาขึ้นแข็งแกร่ง"; strategy_text = "Buy on Dip / Hold"
         holder_advice = f"เทรนด์ยังดีมาก ถือต่อได้ ถ้าย่อมาแถว EMA 20 ({ema20:.2f}) เป็นโอกาสสะสม"
-        
     elif score >= 1:
         status_color = "green"; banner_title = "📈 Moderate Bullish: ขาขึ้นต่อเนื่อง"; strategy_text = "Accumulate (ทยอยสะสม)"
         holder_advice = "ราคาไต่ขึ้นแบบ Low Volatility ถือได้เรื่อยๆ สบายใจ"
-        
     elif score >= -2:
         status_color = "yellow"; banner_title = "⚖️ Neutral: ไซด์เวย์"; strategy_text = "Wait & See"
         holder_advice = "ตลาดไม่ไปไหน ทนถือหรือเปลี่ยนตัวเล่น"
-        
     else:
         status_color = "red"; banner_title = "🐻 Bearish: ขาลง"; strategy_text = "Avoid / Cut Loss"
         holder_advice = "ถ้าหลุด EMA 20 ต้องยอมมอบตัว อย่าสวนเทรนด์"
@@ -537,7 +524,14 @@ if submit_btn:
             rsi_str = f"{rsi:.2f}" if not np.isnan(rsi) else "N/A"; rsi_text = get_rsi_interpretation(rsi)
             st.markdown(custom_metric_html("⚡ RSI (14)", rsi_str, rsi_text, "gray", icon_flat_svg), unsafe_allow_html=True)
         with c5:
-            is_uptrend = price >= ema200 if not np.isnan(ema200) else True; adx_text = get_adx_interpretation(adx_val, is_uptrend); adx_str = f"{adx_val:.2f}" if not np.isnan(adx_val) else "N/A"
+            # [FIX: SAFE GUARD for DISPLAY] ป้องกัน Error ตรงจุดแสดงผล
+            ema200_disp = float(ema200) if not np.isnan(ema200) else np.nan
+            price_disp = float(price) if not np.isnan(price) else np.nan
+            adx_disp = float(adx_val) if not np.isnan(adx_val) else np.nan
+            
+            is_uptrend = price_disp >= ema200_disp if not np.isnan(ema200_disp) and not np.isnan(price_disp) else True
+            adx_text = get_adx_interpretation(adx_disp, is_uptrend)
+            adx_str = f"{adx_disp:.2f}" if not np.isnan(adx_disp) else "N/A"
             st.markdown(custom_metric_html("💪 ADX Strength", adx_str, adx_text, "gray", icon_flat_svg), unsafe_allow_html=True)
         
         st.write("") 
