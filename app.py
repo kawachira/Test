@@ -4,7 +4,7 @@ import pandas as pd
 import pandas_ta as ta
 import numpy as np
 import time
-from datetime import datetime
+from datetime import datetime, timedelta
 
 # --- 1. ตั้งค่าหน้าเว็บ (The Master Version) ---
 st.set_page_config(page_title="AI Stock Master", page_icon="💎", layout="wide")
@@ -13,7 +13,7 @@ st.set_page_config(page_title="AI Stock Master", page_icon="💎", layout="wide"
 if 'history_log' not in st.session_state:
     st.session_state['history_log'] = []
 
-# --- 2. CSS ปรับแต่ง (Clean & Professional) - คงเดิม 100% ---
+# --- 2. CSS ปรับแต่ง (Clean & Professional) ---
 st.markdown("""
     <style>
     body { overflow-x: hidden; }
@@ -57,11 +57,21 @@ st.markdown("""
         margin-bottom: 8px;
         font-size: 0.95rem;
     }
+    /* Fundamental Box Style */
+    .fund-box {
+        padding: 10px;
+        border-radius: 8px;
+        margin-bottom: 5px;
+        font-size: 0.9rem;
+    }
+    .fund-good { background-color: #dcfce7; color: #14532d; border: 1px solid #22c55e; }
+    .fund-mid { background-color: #fef9c3; color: #713f12; border: 1px solid #eab308; }
+    .fund-bad { background-color: #fee2e2; color: #7f1d1d; border: 1px solid #ef4444; }
     </style>
     """, unsafe_allow_html=True)
 
 # --- 3. ส่วนหัวข้อ ---
-st.markdown("<h1>💎 Ai<br><span style='font-size: 1.5rem; opacity: 0.7;'>ระบบวิเคราะห์หุ้นอัจฉริยะ (Ultimate Sniper)🪐</span></h1>", unsafe_allow_html=True)
+st.markdown("<h1>💎 Ai<br><span style='font-size: 1.5rem; opacity: 0.7;'>ระบบวิเคราะห์หุ้นอัจฉริยะ (Ultimate Sniper Final)🪐</span></h1>", unsafe_allow_html=True)
 
 # --- Form ค้นหา ---
 col_space1, col_form, col_space2 = st.columns([1, 2, 1])
@@ -195,6 +205,57 @@ def filter_levels(levels, threshold_pct=0.025):
             if diff > threshold_pct: selected.append((val, label))
     return selected
 
+# --- NEW: Fundamental Analysis Function ---
+def analyze_fundamental(info):
+    pe = info.get('trailingPE', None)
+    eps_growth = info.get('earningsQuarterlyGrowth', None) # Quarterly growth
+    rev_growth = info.get('revenueGrowth', None)
+    
+    score = 0
+    status = "Neutral"
+    color_class = "fund-mid"
+    summary_text = "ข้อมูลพื้นฐานกลางๆ"
+    advice = "เล่นตามรอบ (Swing Trade)"
+
+    # 1. PE Check
+    pe_msg = "N/A"
+    if pe:
+        pe_msg = f"{pe:.2f}"
+        if pe < 0: score -= 2; pe_msg += " (ขาดทุน)"
+        elif pe < 20: score += 1; pe_msg += " (ถูก)"
+        elif pe > 50: score -= 1; pe_msg += " (แพง)"
+    
+    # 2. Growth Check
+    growth_msg = "N/A"
+    if eps_growth:
+        growth_pct = eps_growth * 100
+        growth_msg = f"{growth_pct:+.2f}%"
+        if growth_pct > 15: score += 2; growth_msg += " (โตแรง)"
+        elif growth_pct > 0: score += 1; growth_msg += " (โตปกติ)"
+        else: score -= 2; growth_msg += " (กำไรหด)"
+    
+    # Final Decision
+    if score >= 2:
+        status = "Strong Fundamental (งบดี)"
+        color_class = "fund-good"
+        summary_text = "✅ **งบแกร่ง:** กำไรเติบโตดี/ราคาไม่แพงเวอร์"
+        advice = "💎 **ถือยาวได้ / ใส่เงินเยอะได้ (Investable)**"
+    elif score <= -2:
+        status = "Weak Fundamental (งบเน่า)"
+        color_class = "fund-bad"
+        summary_text = "🔴 **งบแย่:** ขาดทุนหรือกำไรถดถอย"
+        advice = "⚠️ **เก็งกำไรสั้นๆ เท่านั้น / ห้ามถือยาว (Speculative)**"
+    else:
+        status = "Moderate (งบกลางๆ)"
+        color_class = "fund-mid"
+        summary_text = "⚖️ **งบกลางๆ:** พอไปวัดไปวาได้"
+        advice = "🔄 **เล่นตามรอบเทคนิค (Swing Trade)**"
+
+    return {
+        "pe": pe_msg, "growth": growth_msg, "status": status, 
+        "color_class": color_class, "summary": summary_text, "advice": advice
+    }
+
 # --- 5. Data Fetching ---
 @st.cache_data(ttl=60, show_spinner=False)
 def get_data_hybrid(symbol, interval, mtf_interval):
@@ -240,6 +301,8 @@ def get_data_hybrid(symbol, interval, mtf_interval):
             'longName': raw_info.get('longName', symbol), 
             'marketState': raw_info.get('marketState', 'REGULAR'), 
             'trailingPE': raw_info.get('trailingPE', None), 
+            'earningsQuarterlyGrowth': raw_info.get('earningsQuarterlyGrowth', None),
+            'revenueGrowth': raw_info.get('revenueGrowth', None),
             'sector': raw_info.get('sector', 'Unknown'),
             'regularMarketPrice': header_price, 
             'regularMarketChange': header_change,
@@ -254,8 +317,26 @@ def get_data_hybrid(symbol, interval, mtf_interval):
             'postMarketChange': raw_info.get('postMarketChange'), 
             'postMarketChangePercent': raw_info.get('postMarketChangePercent'),
         }
+        
+        # Get Calendar
+        try:
+            cal = ticker.calendar
+            if cal is not None and not cal.empty:
+                if isinstance(cal, pd.DataFrame):
+                    next_earn = cal.iloc[0, 0] if not cal.empty else "N/A"
+                    if isinstance(next_earn, (datetime, pd.Timestamp)):
+                         next_earn = next_earn.strftime("%Y-%m-%d")
+                    stock_info['nextEarnings'] = next_earn
+                elif isinstance(cal, dict):
+                     stock_info['nextEarnings'] = cal.get('Earnings Date', ['N/A'])[0]
+            else:
+                stock_info['nextEarnings'] = "N/A (Not Found)"
+        except:
+             stock_info['nextEarnings'] = "N/A (Error)"
+
         return df, stock_info, df_mtf
     except Exception as e: return None, None, None
+
 
 # --- 6. Analysis Logic ---
 
@@ -266,12 +347,12 @@ def analyze_volume(row, vol_ma):
     elif vol < vol_ma * 0.7: return "Low Volume", "red"
     else: return "Normal Volume", "gray"
 
-# --- 7. AI Decision Engine (THE BRAIN: UPDATED FOR ULTIMATE ACCURACY) ---
+# --- 7. AI Decision Engine ---
 def ai_hybrid_analysis(price, ema20, ema50, ema200, rsi, macd_val, macd_sig, adx, bb_up, bb_low, 
                        vol_status, mtf_trend, atr_val, mtf_ema200_val,
                        open_price, high, low, close, obv_val, obv_avg,
                        obv_slope, rolling_min, rolling_max,
-                       prev_open, prev_close, vol_now, vol_avg): # <--- รับค่าเพิ่ม
+                       prev_open, prev_close, vol_now, vol_avg):
 
     # --- 🛡️ Data Sanitization ---
     def safe_float(x):
@@ -317,7 +398,6 @@ def ai_hybrid_analysis(price, ema20, ema50, ema200, rsi, macd_val, macd_sig, adx
         elif obv_slope < 0:
             obv_status = "Distribution (รินขาย)"
             obv_insight_msg = "OBV ชี้ลง (รายใหญ่เทขาย)"
-            obv_is_bullish = False # Fix: Should be False or check bearish
             obv_is_bearish = True
             if price > ema20:
                 has_bearish_divergence = True
@@ -327,32 +407,32 @@ def ai_hybrid_analysis(price, ema20, ema50, ema200, rsi, macd_val, macd_sig, adx
     bullish_factors = [] 
     bearish_factors = []
     
-    # --- 🆕 1. Gap Analysis (เปิดกระโดด) ---
+    # --- Gap Analysis ---
     is_gap_up = False
     is_gap_down = False
     if prev_close > 0:
-        if open_price > prev_close * 1.005: # เปิดกระโดด > 0.5%
+        if open_price > prev_close * 1.005: 
             is_gap_up = True
             score += 2
             bullish_factors.append("🚀 Gap Up: ราคาเปิดกระโดดหนีแรงขาย (Strong Sign)")
-        elif open_price < prev_close * 0.995: # เปิดกระโดดลง < 0.5%
+        elif open_price < prev_close * 0.995: 
             is_gap_down = True
             score -= 2
             bearish_factors.append("🩸 Gap Down: ราคาเปิดกระโดดลง (Panic Open)")
 
-    # --- 🆕 2. Advance Candlestick (Engulfing) ---
+    # --- Advance Candlestick ---
     is_engulfing_bull = False
     is_engulfing_bear = False
-    if prev_close < prev_open and close > open_price: # เมื่อวานแดง วันนี้เขียว
-        if close > prev_open and open_price < prev_close: # คลุมมิด
+    if prev_close < prev_open and close > open_price: 
+        if close > prev_open and open_price < prev_close: 
             is_engulfing_bull = True
             score += 2
-            bullish_factors.append("🔥 Candlestick: Bullish Engulfing (แท่งเทียนกลืนกินขาขึ้น - กลับตัวแรง)")
-    if prev_close > prev_open and close < open_price: # เมื่อวานเขียว วันนี้แดง
-        if close < prev_open and open_price > prev_close: # คลุมมิด
+            bullish_factors.append("🔥 Candlestick: Bullish Engulfing (แท่งเทียนกลืนกินขาขึ้น)")
+    if prev_close > prev_open and close < open_price: 
+        if close < prev_open and open_price > prev_close: 
             is_engulfing_bear = True
             score -= 2
-            bearish_factors.append("🩸 Candlestick: Bearish Engulfing (แท่งเทียนกลืนกินขาลง - อันตราย)")
+            bearish_factors.append("🩸 Candlestick: Bearish Engulfing (แท่งเทียนกลืนกินขาลง)")
 
     # Structure Check
     is_uptrend_structure = False
@@ -361,7 +441,7 @@ def ai_hybrid_analysis(price, ema20, ema50, ema200, rsi, macd_val, macd_sig, adx
             if not np.isnan(ema200) and price > ema200:
                 is_uptrend_structure = True
     
-    # 2. ให้คะแนน Trend (Base Score) - AI Hybrid
+    # 2. ให้คะแนน Trend
     trend_is_up = False
     if not np.isnan(ema200):
         if price > ema200:
@@ -384,17 +464,17 @@ def ai_hybrid_analysis(price, ema20, ema50, ema200, rsi, macd_val, macd_sig, adx
     elif mtf_trend == "Bearish":
         score -= 1; bearish_factors.append("Multi-Timeframe Warning: TF ใหญ่ยังเป็นขาลง")
             
-    # 3. การประมวลผลชั้นสูง (Advanced Synthesis)
+    # 3. การประมวลผลชั้นสูง
     situation_insight = "ตลาดแกว่งตัวตามปกติ"
     
     # Sideway Filter
     is_sideway = False
     if not np.isnan(adx) and adx < 20 and not is_squeeze:
         is_sideway = True
-        score = 0 # Reset score
+        score = 0 
         situation_insight = "😴 **Sideway Mode:** ADX ต่ำ (<20) ตลาดไร้เทรนด์ชัดเจน ระวัง Whipsaw"
 
-    # 3.1: OBV Divergence
+    # OBV & Insights
     if has_bullish_divergence:
         score += 3
         bullish_factors.append("🚀 **OBV Smart Booster:** เจอ Hidden Divergence (เจ้าเก็บของสวนราคา)")
@@ -403,11 +483,9 @@ def ai_hybrid_analysis(price, ema20, ema50, ema200, rsi, macd_val, macd_sig, adx
         score -= 3
         bearish_factors.append("💣 **OBV Smart Booster:** เจอ Bearish Divergence (ราคาขึ้นแต่ไส้ในกลวง)")
         situation_insight = "⚠️ **Trap Warning:** ระวังกับดักราคา (Price Trap)"
-
-    # 3.2: Quiet Uptrend
     elif not np.isnan(adx) and adx < 25 and not is_sideway:
         if is_uptrend_structure:
-            situation_insight = "📈 **Quiet Uptrend:** ราคาไต่ระดับขึ้นยืนเหนือ EMA หลักได้มั่นคง (Low Volatility)"
+            situation_insight = "📈 **Quiet Uptrend:** ราคาไต่ระดับขึ้นยืนเหนือ EMA หลักได้มั่นคง"
             bullish_factors.append("ราคาฟื้นตัวยืนเหนือเส้น EMA หลักได้ (Recovery)")
         elif (is_big_candle and "Bullish" in candle_pattern) or is_engulfing_bull:
             score += 3; situation_insight = "🚀 **Awakening Breakout:** ตลาดระเบิดพลังจากความเงียบด้วยแท่งเทียนกลับตัว!"
@@ -416,7 +494,6 @@ def ai_hybrid_analysis(price, ema20, ema50, ema200, rsi, macd_val, macd_sig, adx
             score -= 3; situation_insight = "💥 **Panic Breakdown:** ตลาดทิ้งตัวแรงจากความเงียบ!"
             bearish_factors.append("ทุบหลุดกรอบ Sideway")
             
-    # 3.3: Reversal & Pullback
     elif score < 0 and ("Hammer" in candle_pattern or is_engulfing_bull) and rsi < 35:
         score += 2; situation_insight = "↩️ **Potential Reversal:** เทรนด์หลักลง แต่เกิดแพทเทิร์นกลับตัวในโซน Oversold"
         bullish_factors.append("แพทเทิร์นกลับตัวในโซน Oversold")
@@ -424,39 +501,35 @@ def ai_hybrid_analysis(price, ema20, ema50, ema200, rsi, macd_val, macd_sig, adx
         score -= 2; situation_insight = "⚠️ **Pullback Warning:** เทรนด์ขึ้น แต่เจอแรงขายกดดัน ระวังย่อตัว"
         bearish_factors.append("แพทเทิร์นกลับตัวลงในโซน Overbought")
 
-    # 3.4: Squeeze Logic
     if is_squeeze:
         rsi_bull = rsi > 55 if not np.isnan(rsi) else False
         rsi_bear = rsi < 45 if not np.isnan(rsi) else False
-        
         if is_big_candle or is_engulfing_bull or is_engulfing_bear: 
             situation_insight = "💣 **Squeeze Breakout:** ระเบิดออกจากกรอบบีบตัว!"
         elif trend_is_up and rsi_bull and obv_is_bullish:
-            situation_insight = "🚀 **High Prob. Breakout UP:** เทรนด์ขึ้น + RSI กระทิง + เจ้าเก็บของ (โอกาสระเบิดขึ้นสูง)"
+            situation_insight = "🚀 **High Prob. Breakout UP:** เทรนด์ขึ้น + RSI กระทิง + เจ้าเก็บของ"
             score += 2
         elif (not trend_is_up) and rsi_bear and obv_is_bearish:
-            situation_insight = "🩸 **High Prob. Breakdown DOWN:** เทรนด์ลง + RSI หมี + เจ้าเทขาย (โอกาสระเบิดลงสูง)"
+            situation_insight = "🩸 **High Prob. Breakdown DOWN:** เทรนด์ลง + RSI หมี + เจ้าเทขาย"
             score -= 2
         else:
              situation_insight = "⚡ **Volatility Squeeze:** กราฟบีบตัวแน่น รอเลือกทาง"
 
-    # 4. Volume & 🆕 RVOL Calculation
+    # Volume
     vol_msg = "Normal"
     rvol = vol_now / vol_avg if vol_avg > 0 else 0
-    
-    if rvol > 3.0: # วอลุ่มเข้ามากกว่า 3 เท่า
+    if rvol > 3.0: 
         score += 2
         vol_msg = "Explosive Buying" if price > open_price else "Panic Dump"
-        if price > open_price: bullish_factors.append(f"🚀 Volume Explosion: วอลุ่มเข้า {rvol:.1f} เท่า (ระเบิด)")
+        if price > open_price: bullish_factors.append(f"🚀 Volume Explosion: วอลุ่มเข้า {rvol:.1f} เท่า")
         else: bearish_factors.append(f"💥 Volume Explosion: วอลุ่มถล่มขาย {rvol:.1f} เท่า")
     elif "High Volume" in vol_status:
         if price > open_price: score += 1; vol_msg = "Strong Buying (ซื้อจริง)"; bullish_factors.append("Volume เข้าสนับสนุนการขึ้น")
         else: score -= 1; vol_msg = "Panic Selling (ขายจริง)"; bearish_factors.append("Volume ถล่มขาย")
             
-    # 5. สรุป Strategy & Structure Based Stop Loss
+    # Strategy
     status_color = "yellow"; banner_title = ""; strategy_text = ""; holder_advice = ""
     
-    # คำนวณ SL/TP
     if not np.isnan(rolling_min) and price > rolling_min and (price - rolling_min) < (3 * atr_val):
         sl_val = rolling_min
         sl_msg = "Low เดิม (Structure Based)"
@@ -466,7 +539,6 @@ def ai_hybrid_analysis(price, ema20, ema50, ema200, rsi, macd_val, macd_sig, adx
 
     tp_val = price + (3 * atr_val) if not np.isnan(atr_val) else price * 1.05
 
-    # --- 🆕 3. RRR Check (Risk:Reward) ---
     risk = price - sl_val
     reward = tp_val - price
     rrr = reward / risk if risk > 0 else 0
@@ -474,7 +546,7 @@ def ai_hybrid_analysis(price, ema20, ema50, ema200, rsi, macd_val, macd_sig, adx
     rrr_warning = ""
     if rrr < 1.5 and score > 0:
         rrr_warning = f"⚠️ จุดเข้าไม่สวย RRR แค่ {rrr:.2f} (ได้ไม่คุ้มเสีย)"
-        score -= 1 # หักคะแนนความน่าสนใจลง
+        score -= 1 
     elif rrr >= 2.0 and score > 0:
         bullish_factors.append(f"💰 RRR สูง ({rrr:.2f}) จุดเข้าได้เปรียบ")
 
@@ -482,13 +554,13 @@ def ai_hybrid_analysis(price, ema20, ema50, ema200, rsi, macd_val, macd_sig, adx
         status_color = "orange"; banner_title = "💣 Squeeze Watch: รอระเบิด"; strategy_text = "Wait for Breakout"
         holder_advice = f"ตั้ง Alert รอ! ถ้าทะลุ {bb_up:.2f} ให้ตาม แต่ถ้าหลุด {bb_low:.2f} ให้หนี"
     elif score >= 5:
-        status_color = "green"; banner_title = "🚀 Super Nova: กระทิงดุ"; strategy_text = "Aggressive Buy / Let Profit Run"
-        holder_advice = f"กอดหุ้นแน่นๆ ตลาดเป็นใจทุกอย่าง (Trend + Momentum + Volume) จุด SL: {sl_val:.2f} ({sl_msg})"
+        status_color = "green"; banner_title = "🚀 Super Nova: กระทิงดุ"; strategy_text = "Aggressive Buy"
+        holder_advice = f"กอดหุ้นแน่นๆ ตลาดเป็นใจทุกอย่าง จุด SL: {sl_val:.2f} ({sl_msg})"
     elif score >= 3:
         status_color = "green"; banner_title = "🐂 Bullish: ขาขึ้นแข็งแกร่ง"; strategy_text = "Buy on Dip / Hold"
         holder_advice = f"เทรนด์ยังดีมาก ถือต่อได้ ถ้าย่อมาแถว EMA 20 ({ema20:.2f}) เป็นโอกาสสะสม"
     elif score >= 1:
-        status_color = "green"; banner_title = "📈 Moderate Bullish: ขาขึ้นต่อเนื่อง"; strategy_text = "Accumulate (ทยอยสะสม)"
+        status_color = "green"; banner_title = "📈 Moderate Bullish: ขาขึ้นต่อเนื่อง"; strategy_text = "Accumulate"
         holder_advice = "ราคาไต่ขึ้นแบบ Low Volatility ถือได้เรื่อยๆ สบายใจ"
     elif score >= -2:
         status_color = "yellow"; banner_title = "⚖️ Neutral: ไซด์เวย์"; strategy_text = "Wait & See"
@@ -497,7 +569,6 @@ def ai_hybrid_analysis(price, ema20, ema50, ema200, rsi, macd_val, macd_sig, adx
         status_color = "red"; banner_title = "🐻 Bearish: ขาลง"; strategy_text = "Avoid / Cut Loss"
         holder_advice = "ถ้าหลุด EMA 20 ต้องยอมมอบตัว อย่าสวนเทรนด์"
 
-    # เติมคำเตือน RRR ลงในคำแนะนำ
     if rrr_warning: holder_advice += f" | {rrr_warning}"
 
     return {
@@ -508,12 +579,12 @@ def ai_hybrid_analysis(price, ema20, ema50, ema200, rsi, macd_val, macd_sig, adx
         "obv_insight_msg": obv_insight_msg, "obv_status": obv_status
     }
 
-# --- 8. Display Execution (Original UI 100% Preserved) ---
+# --- 8. Display Execution (Updated with Status Bar) ---
 
 if submit_btn:
     st.divider()
     st.markdown("""<style>body { overflow: auto !important; }</style>""", unsafe_allow_html=True)
-    with st.spinner(f"AI กำลังประมวลผล {symbol_input} แบบ Ultimate Sniper (Pro Version)..."):
+    with st.spinner(f"AI กำลังประมวลผล {symbol_input} แบบ Ultimate Sniper (Final Version)..."):
         df, info, df_mtf = get_data_hybrid(symbol_input, tf_code, mtf_code)
 
     if df is not None and not df.empty and len(df) > 10: 
@@ -573,7 +644,6 @@ if submit_btn:
                 if df_mtf['Close'].iloc[-1] > mtf_ema200_val: mtf_trend = "Bullish"
                 else: mtf_trend = "Bearish"
         
-        # 🆕 Extract Previous Data for AI (Gap & Engulfing)
         try:
             prev_open = df['Open'].iloc[-2]
             prev_close = df['Close'].iloc[-2]
@@ -581,12 +651,11 @@ if submit_btn:
         except:
             prev_open = 0; prev_close = 0; vol_avg = 1
 
-        # AI Analysis Call (Updated Signature)
         ai_report = ai_hybrid_analysis(price, ema20, ema50, ema200, rsi, macd_val, macd_signal, adx_val, bb_upper, bb_lower, 
                                        vol_status, mtf_trend, atr, mtf_ema200_val,
                                        open_p, high_p, low_p, close_p, obv_val, obv_avg,
                                        obv_slope_val, rolling_min_val, rolling_max_val,
-                                       prev_open, prev_close, vol_now, vol_avg) # <--- Pass New Params
+                                       prev_open, prev_close, vol_now, vol_avg)
 
         # Log
         current_time = datetime.now().strftime("%H:%M:%S")
@@ -594,11 +663,36 @@ if submit_btn:
         st.session_state['history_log'].insert(0, log_entry)
         if len(st.session_state['history_log']) > 10: st.session_state['history_log'] = st.session_state['history_log'][:10]
 
-        # DISPLAY (Original 100% Preserved)
+        # DISPLAY
         logo_url = f"https://financialmodelingprep.com/image-stock/{symbol_input}.png"
         fallback_url = "https://cdn-icons-png.flaticon.com/512/720/720453.png"
         icon_html = f"""<img src="{logo_url}" onerror="this.onerror=null; this.src='{fallback_url}';" style="height: 50px; width: 50px; border-radius: 50%; vertical-align: middle; margin-right: 10px; object-fit: contain; background-color: white; border: 1px solid #e0e0e0; padding: 2px;">"""
         st.markdown(f"<h2 style='text-align: center; margin-top: -15px; margin-bottom: 25px;'>{icon_html} {info['longName']} ({symbol_input})</h2>", unsafe_allow_html=True)
+
+        # --- NEW: Market Status Bar (Inserted Here) ---
+        m_state = info.get('marketState', '').upper()
+        last_date_str = df.index[-1].strftime('%d %b %Y')
+        if m_state == "REGULAR":
+            st_msg = "🟢 **Market Open:** กำลังวิเคราะห์ Real-time..."
+            st_bg = "#dcfce7"; st_color = "#166534"
+        elif m_state in ["PRE", "PREPRE"]:
+            st_msg = "🟠 **Pre-Market:** ตลาดกำลังจะเปิด (ข้อมูล Gap/RSI ยังอิงจากปิดวันก่อน)"
+            st_bg = "#ffedd5"; st_color = "#9a3412"
+        elif m_state in ["POST", "POSTPOST"]:
+            st_msg = "🌙 **Post-Market:** ปิดตลาดแล้ว (ราคาขยับนอกเวลาทำการ)"
+            st_bg = "#e0e7ff"; st_color = "#3730a3"
+        else: # CLOSED
+            st_msg = f"🔴 **Market Closed:** วิเคราะห์จากข้อมูลปิดตลาดวันที่ {last_date_str}"
+            st_bg = "#fee2e2"; st_color = "#991b1b"
+            
+        st.markdown(f"""
+        <div style="text-align: center; margin-bottom: 20px;">
+            <div style="background-color: {st_bg}; color: {st_color}; padding: 8px 20px; border-radius: 30px; font-size: 0.95rem; font-weight: 600; display: inline-block; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
+                {st_msg}
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+        # -----------------------------------------------
 
         c1, c2 = st.columns(2)
         with c1:
@@ -608,7 +702,7 @@ if submit_btn:
             color_text = "#16a34a" if reg_chg and reg_chg > 0 else "#dc2626"; bg_color = "#e8f5ec" if reg_chg and reg_chg > 0 else "#fee2e2"
             st.markdown(f"""<div style="margin-bottom:5px; display: flex; align-items: center; gap: 15px; flex-wrap: wrap;"><div style="font-size:40px; font-weight:600; line-height: 1;">{reg_price:,.2f} <span style="font-size: 20px; color: #6b7280; font-weight: 400;">USD</span></div><div style="display:inline-flex; align-items:center; gap:6px; background:{bg_color}; color:{color_text}; padding:4px 12px; border-radius:999px; font-size:18px; font-weight:500;">{arrow_html(reg_chg)} {reg_chg:+.2f} ({reg_pct:.2f}%)</div></div>""", unsafe_allow_html=True)
             def make_pill(change, percent): color = "#16a34a" if change >= 0 else "#dc2626"; bg = "#e8f5ec" if change >= 0 else "#fee2e2"; arrow = "▲" if change >= 0 else "▼"; return f'<span style="background:{bg}; color:{color}; padding: 2px 8px; border-radius: 10px; font-size: 12px; font-weight: 600; margin-left: 8px;">{arrow} {change:+.2f} ({percent:.2f}%)</span>'
-            ohlc_html = ""; m_state = info.get('marketState', '').upper()
+            ohlc_html = ""; 
             if m_state != "REGULAR": 
                 d_open = info.get('regularMarketOpen'); d_high = info.get('dayHigh'); d_low = info.get('dayLow'); d_close = info.get('regularMarketPrice')
                 if d_open and d_high and d_low and d_close: day_chg = info.get('regularMarketChange', 0); val_color = "#16a34a" if day_chg >= 0 else "#dc2626"; ohlc_html = f"""<div style="font-size: 12px; font-weight: 600; margin-bottom: 5px; font-family: 'Source Sans Pro', sans-serif; white-space: nowrap; overflow-x: auto;"><span style="margin-right: 5px; opacity: 0.7;">O</span><span style="color: {val_color}; margin-right: 12px;">{d_open:.2f}</span><span style="margin-right: 5px; opacity: 0.7;">H</span><span style="color: {val_color}; margin-right: 12px;">{d_high:.2f}</span><span style="margin-right: 5px; opacity: 0.7;">L</span><span style="color: {val_color}; margin-right: 12px;">{d_low:.2f}</span><span style="margin-right: 5px; opacity: 0.7;">C</span><span style="color: {val_color};">{d_close:.2f}</span></div>"""
@@ -630,9 +724,23 @@ if submit_btn:
         icon_up_svg = """<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#16a34a" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5"/><path d="M5 12l7-7 7 7"/></svg>"""
         icon_down_svg = """<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#dc2626" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14"/><path d="M5 12l7 7 7-7"/></svg>"""
         icon_flat_svg = """<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="#a3a3a3"><circle cx="12" cy="12" r="10"/></svg>"""
+        
         with c3:
-            pe_val = info.get('trailingPE'); pe_str = f"{pe_val:.2f}" if isinstance(pe_val, (int, float)) else "N/A"; pe_interp = get_pe_interpretation(pe_val)
-            st.markdown(custom_metric_html("📊 P/E Ratio", pe_str, pe_interp, "gray", icon_flat_svg), unsafe_allow_html=True)
+            fund_data = analyze_fundamental(info)
+            next_earn_date = info.get('nextEarnings', 'N/A')
+            st.markdown(f"""<div style="margin-bottom: 5px; font-weight: 700; opacity: 0.9; font-size: 18px;">📊 Fundamental</div>""", unsafe_allow_html=True)
+            with st.expander(f"{fund_data['status']} (Click)", expanded=False):
+                st.markdown(f"""
+                <div class='fund-box {fund_data['color_class']}'>
+                    <div style='font-weight:bold; font-size:1.1em; margin-bottom:5px;'>{fund_data['summary']}</div>
+                    <div>• <b>P/E Ratio:</b> {fund_data['pe']}</div>
+                    <div>• <b>EPS Growth:</b> {fund_data['growth']}</div>
+                    <div>• <b>Next Earnings:</b> {next_earn_date}</div>
+                    <hr style='margin: 5px 0; border-color: rgba(0,0,0,0.1);'>
+                    <div style='font-style:italic;'>💡 {fund_data['advice']}</div>
+                </div>
+                """, unsafe_allow_html=True)
+
         with c4:
             rsi_str = f"{rsi:.2f}" if not np.isnan(rsi) else "N/A"; rsi_text = get_rsi_interpretation(rsi)
             st.markdown(custom_metric_html("⚡ RSI (14)", rsi_str, rsi_text, "gray", icon_flat_svg), unsafe_allow_html=True)
