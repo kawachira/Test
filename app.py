@@ -761,81 +761,84 @@ if submit_btn:
             atr_pct = (atr / price) * 100 if not np.isnan(atr) and price > 0 else 0; atr_s = f"{atr:.2f} ({atr_pct:.1f}%)" if not np.isnan(atr) else "N/A"; macd_s = f"{macd_val:.3f}" if not np.isnan(macd_val) else "N/A"
             st.markdown(f"""<div style='background-color: var(--secondary-background-color); padding: 15px; border-radius: 10px; font-size: 0.95rem;'><div style='display:flex; justify-content:space-between; margin-bottom:5px; border-bottom:1px solid #ddd; font-weight:bold;'><span>Indicator</span> <span>Value</span></div><div style='display:flex; justify-content:space-between;'><span>EMA 20</span> <span>{e20_s}</span></div><div style='display:flex; justify-content:space-between;'><span>EMA 200</span> <span>{e200_s}</span></div><div style='display:flex; justify-content:space-between;'><span>MACD</span> <span>{macd_s}</span></div><div style='display:flex; justify-content:space-between;'><span>Volume ({vol_str})</span> <span style='color:{vol_color}'>{vol_status.split(' ')[0]}</span></div><div style='display:flex; justify-content:space-between;'><span>ATR</span> <span>{atr_s}</span></div></div>""", unsafe_allow_html=True)
             
-            # --- MODIFIED: Smart Support Logic (Final Sorted Version) ---
+            # --- MODIFIED: Smart Support Logic (Grandparent TF Injection) ---
             st.subheader("🚧 Key Levels (Smart Support)")
             
-            # 1. Prepare Data & Calc MTF EMA 50
+            # 1. Prepare Parent Data (MTF)
             if df_mtf is not None and not df_mtf.empty:
-                df_mtf['EMA50'] = ta.ema(df_mtf['Close'], length=50)
+                if 'EMA50' not in df_mtf.columns: df_mtf['EMA50'] = ta.ema(df_mtf['Close'], length=50)
+                if 'EMA200' not in df_mtf.columns: df_mtf['EMA200'] = ta.ema(df_mtf['Close'], length=200)
                 mtf_ema50_val = df_mtf['EMA50'].iloc[-1]
+                mtf_ema200_val = df_mtf['EMA200'].iloc[-1]
             else:
-                mtf_ema50_val = np.nan
+                mtf_ema50_val = np.nan; mtf_ema200_val = np.nan
             
-            # Dynamic Labels based on Timeframe
-            if tf_code == "1d": 
-                label_mtf_50 = "EMA 50 Week (รับระยะกลาง)"
-                label_mtf_200 = "🛡️ EMA 200 Week (รับระดับกองทุน)"
-            elif tf_code == "1h": 
+            # 2. Prepare Grandparent Data (Deep Support)
+            g_ema50_val = np.nan; g_ema200_val = np.nan
+            g_label_50 = ""; g_label_200 = ""
+            label_mtf_50 = ""; label_mtf_200 = ""
+
+            if tf_code == "1h": 
                 label_mtf_50 = "EMA 50 Day (รับรายวัน)"
                 label_mtf_200 = "🛡️ EMA 200 Day (รับใหญ่รายวัน)"
+                if df_mtf is not None and not df_mtf.empty:
+                    try:
+                        df_week = df_mtf['Close'].resample('W-FRI').last() 
+                        g_ema50_val = ta.ema(df_week, length=50).iloc[-1]
+                        g_ema200_val = ta.ema(df_week, length=200).iloc[-1]
+                        g_label_50 = "EMA 50 Week (รับระยะกลาง)"
+                        g_label_200 = "🔥 EMA 200 Week (รับระดับกองทุน)"
+                    except: pass
+            elif tf_code == "1d": 
+                label_mtf_50 = "EMA 50 Week (รับระยะกลาง)"
+                label_mtf_200 = "🛡️ EMA 200 Week (รับระดับกองทุน)"
             else:
                 label_mtf_50 = f"EMA 50 {mtf_code.upper()}"
                 label_mtf_200 = f"EMA 200 {mtf_code.upper()}"
 
-            # Calculate Price Floor
-            if tf_code == "1h": 
-                window_1y = 252 * 7 # 1 year ~ 252 trading days * 7 hours
-            else: 
-                window_1y = 252
-
+            if tf_code == "1h": window_1y = 252 * 7 
+            else: window_1y = 252
+            
             low_60d = df['Low'].tail(60).min()
             low_52w = df['Low'].tail(window_1y).min()
-            major_low = df['Low'].min() # All-time low in dataset (5y/2y)
+            major_low = df['Low'].min() 
 
-            # 2. Raw List (Nearest First Logic will sort this)
+            # 3. Raw List
             potential_supports = [
                 (bb_lower, "BB Lower (กรอบล่าง)"), 
                 (ema200, "EMA 200 (TF ปัจจุบัน)"),
-                (ema20, "EMA 20 (TF ปัจจุบัน)"),
                 (low_60d, "Low 60d (ฐานสั้น)"),           
-                (mtf_ema50_val, label_mtf_50),      # <--- EMA 50 MTF Added
-                (mtf_ema200_val, label_mtf_200),    # <--- EMA 200 MTF Added
+                (mtf_ema50_val, label_mtf_50),      
+                (mtf_ema200_val, label_mtf_200),    
+                (g_ema50_val, g_label_50),          
+                (g_ema200_val, g_label_200),        
                 (low_52w, "📉 52-Week Low (ฐานปี)"),       
                 (major_low, "💎 Major Low (ฐาน 5 ปี)")       
             ]
             
-            # 3. Filter & Sort (Highest Value below price = Nearest Support)
+            # 4. Filter & Sort
             valid_supports = []
             seen_values = set()
-            
-            # Sort Descending: Highest price first (closest to current price)
             potential_supports.sort(key=lambda x: x[0] if not np.isnan(x[0]) else -1, reverse=True)
 
             for val, label in potential_supports:
-                if np.isnan(val): continue
-                if val < price: # Must be below current price
-                    # Check for duplicates (within 0.5% difference)
+                if np.isnan(val) or label == "": continue
+                if val < price: 
                     is_duplicate = False
                     for seen_val in seen_values:
                         if abs(val - seen_val) / seen_val < 0.005: 
-                            is_duplicate = True
-                            break
+                            is_duplicate = True; break
                     if not is_duplicate:
                         valid_supports.append((val, label))
                         seen_values.add(val)
 
-            # 4. Display Top 4
+            # 5. Display Top 4
             st.markdown("#### 🟢 แนวรับถัดไป"); 
             if valid_supports: 
-                for v, d in valid_supports[:4]: 
-                    st.write(f"- **{v:.2f}** : {d}")
+                for v, d in valid_supports[:4]: st.write(f"- **{v:.2f}** : {d}")
             else: 
-                # Fallback
-                if price > 100: step = 10
-                elif price > 10: step = 1
-                else: step = 0.5
-                next_round = (int(price / step) * step)
-                st.error(f"🚨 หลุดทุกแนวรับสำคัญ! (All Time Low) แนวรับจิตวิทยาถัดไป: {next_round:.2f}")
+                next_round = (int(price / 0.5) * 0.5)
+                st.error(f"🚨 หลุดทุกแนวรับสำคัญ! แนวรับถัดไป: {next_round:.2f}")
 
             # Resistances (Keep Original)
             potential_resistances = [(ema20, "EMA 20"), (ema200, "EMA 200"), (bb_upper, "BB Upper"), (df['High'].tail(60).max(), "High 60d")]
