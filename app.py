@@ -179,7 +179,6 @@ def get_adx_interpretation(adx, is_uptrend):
     if adx >= 20: return "Developing Trend (เริ่มก่อตัว)"
     return "Weak/Sideway (ตลาดไร้ทิศทาง)"
 
-# --- ตัดฟังก์ชัน display_learning_section ออกแล้ว ---
 
 def filter_levels(levels, threshold_pct=0.025):
     selected = []
@@ -896,6 +895,6 @@ if submit_btn:
         st.subheader("📜 History Log")
         if st.session_state['history_log']: st.dataframe(pd.DataFrame(st.session_state['history_log']), use_container_width=True, hide_index=True)
 
-        # --- ส่วนแสดงมุมความรู้ (Knowledge Corner) ถูกตัดออกตามคำขอ ---
-
+        
     else: st.error("ไม่พบข้อมูลหุ้น")
+
