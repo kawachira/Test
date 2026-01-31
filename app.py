@@ -224,51 +224,61 @@ def analyze_fundamental(info):
 
     return {"status": status, "color_class": color_class, "summary": summary_text, "advice": advice, "pe": f"{pe:.2f}" if pe else "N/A", "growth": f"{eps_growth*100:.2f}%" if eps_growth else "N/A"}
 
-# --- SMC: Find Demand Zones (Swing Lows) ---
+# --- SMC: Find Zones ---
 def find_demand_zones(df, atr_multiplier=0.25):
-    """
-    ค้นหา Demand Zones จาก Swing Low (Fractal 5 แท่ง: ซ้าย 2 ขวา 2)
-    ความกว้างโซน = Swing Low ถึง Swing Low + (ATR * 0.25) <--- ปรับให้แคบลงตามขอ
-    กรองเฉพาะ Fresh Zones ที่ราคายังไม่ปิดหลุด
-    """
+    """ ค้นหา Demand Zones (Swing Low) """
     zones = []
     if len(df) < 20: return zones
     
     lows = df['Low']
-    is_swing_low = (lows < lows.shift(1)) & \
-                   (lows < lows.shift(2)) & \
-                   (lows < lows.shift(-1)) & \
-                   (lows < lows.shift(-2))
-    
+    is_swing_low = (lows < lows.shift(1)) & (lows < lows.shift(2)) & (lows < lows.shift(-1)) & (lows < lows.shift(-2))
     swing_indices = is_swing_low[is_swing_low].index
-    
     current_price = df['Close'].iloc[-1]
     
     for date in swing_indices:
         if date == df.index[-1] or date == df.index[-2]: continue
-        
         swing_low_val = df.loc[date, 'Low']
         atr_val = df.loc[date, 'ATR'] if 'ATR' in df.columns else (swing_low_val * 0.02)
         if np.isnan(atr_val): atr_val = swing_low_val * 0.02
         
         zone_bottom = swing_low_val
-        zone_top = swing_low_val + (atr_val * atr_multiplier) # แคบลง
+        zone_top = swing_low_val + (atr_val * atr_multiplier)
         
-        # Filter: ถ้าโซนอยู่ไกลเกิน 20% ของราคาปัจจุบัน ให้ข้าม (ลด Noise)
         if (current_price - zone_top) / current_price > 0.20: continue
+        future_data = df.loc[date:][1:]
+        if future_data.empty: continue
+        if not (future_data['Close'] < zone_bottom).any():
+            test_count = ((future_data['Low'] <= zone_top) & (future_data['Low'] >= zone_bottom)).sum()
+            zones.append({'bottom': zone_bottom, 'top': zone_top, 'type': 'Fresh' if test_count == 0 else 'Tested'})
+    return zones
+
+def find_supply_zones(df, atr_multiplier=0.25):
+    """ ค้นหา Supply Zones (Swing High) - สำหรับแนวต้าน """
+    zones = []
+    if len(df) < 20: return zones
+    
+    highs = df['High']
+    is_swing_high = (highs > highs.shift(1)) & (highs > highs.shift(2)) & (highs > highs.shift(-1)) & (highs > highs.shift(-2))
+    swing_indices = is_swing_high[is_swing_high].index
+    current_price = df['Close'].iloc[-1]
+    
+    for date in swing_indices:
+        if date == df.index[-1] or date == df.index[-2]: continue
+        swing_high_val = df.loc[date, 'High']
+        atr_val = df.loc[date, 'ATR'] if 'ATR' in df.columns else (swing_high_val * 0.02)
+        if np.isnan(atr_val): atr_val = swing_high_val * 0.02
+        
+        zone_top = swing_high_val
+        zone_bottom = swing_high_val - (atr_val * atr_multiplier)
+        
+        # Filter: ถ้าโซนอยู่สูงเกิน 20% ของราคาปัจจุบัน ให้ข้าม (ลด Noise)
+        if (zone_bottom - current_price) / current_price > 0.20: continue
 
         future_data = df.loc[date:][1:]
         if future_data.empty: continue
-        
-        is_broken = (future_data['Close'] < zone_bottom).any()
-        
-        if not is_broken:
-            test_count = ((future_data['Low'] <= zone_top) & (future_data['Low'] >= zone_bottom)).sum()
-            zones.append({
-                'bottom': zone_bottom,
-                'top': zone_top,
-                'type': 'Fresh' if test_count == 0 else 'Tested'
-            })
+        # Fresh Check: ราคายังไม่เคยปิดทะลุ High ขึ้นไป
+        if not (future_data['Close'] > zone_top).any():
+            zones.append({'bottom': zone_bottom, 'top': zone_top, 'type': 'Fresh'})
             
     return zones
 
@@ -328,7 +338,7 @@ def analyze_volume(row, vol_ma):
     elif vol < vol_ma * 0.7: return "Low Volume (Dry)", "red"
     else: return "Normal", "gray"
 
-# --- 7. NEW AI Decision Engine (Hybrid SMC) ---
+# --- 7. AI Decision Engine (Hybrid SMC) ---
 def ai_hybrid_analysis(price, ema20, ema50, ema200, rsi, macd_val, macd_sig, adx, bb_up, bb_low, 
                        vol_status, mtf_trend, atr_val, mtf_ema200_val,
                        open_price, high, low, close, obv_val, obv_avg,
@@ -450,7 +460,7 @@ def ai_hybrid_analysis(price, ema20, ema50, ema200, rsi, macd_val, macd_sig, adx
 if submit_btn:
     st.divider()
     st.markdown("""<style>body { overflow: auto !important; }</style>""", unsafe_allow_html=True)
-    with st.spinner(f"AI กำลังสแกนหา Demand Zone และประมวลผล {symbol_input}..."):
+    with st.spinner(f"AI กำลังสแกนหา Demand/Supply Zone และประมวลผล {symbol_input}..."):
         # 1. Main Data
         df, info, df_mtf = get_data_hybrid(symbol_input, tf_code, mtf_code)
         
@@ -485,8 +495,9 @@ if submit_btn:
         df['Rolling_Min'] = df['Low'].rolling(window=20).min()
         df['Rolling_Max'] = df['High'].rolling(window=20).max()
 
-        # Find Demand Zones
+        # Find Zones
         demand_zones = find_demand_zones(df, atr_multiplier=0.25)
+        supply_zones = find_supply_zones(df, atr_multiplier=0.25) # NEW for Resistance
         
         last = df.iloc[-1]
         price = info.get('regularMarketPrice') if info.get('regularMarketPrice') else last['Close']
@@ -603,86 +614,118 @@ if submit_btn:
             atr_pct = (atr / price) * 100 if not np.isnan(atr) and price > 0 else 0; atr_s = f"{atr:.2f} ({atr_pct:.1f}%)" if not np.isnan(atr) else "N/A"
             st.markdown(f"""<div style='background-color: var(--secondary-background-color); padding: 15px; border-radius: 10px; font-size: 0.95rem;'><div style='display:flex; justify-content:space-between; margin-bottom:5px; border-bottom:1px solid #ddd; font-weight:bold;'><span>Indicator</span> <span>Value</span></div><div style='display:flex; justify-content:space-between;'><span>EMA 20</span> <span>{e20_s}</span></div><div style='display:flex; justify-content:space-between;'><span>EMA 50</span> <span>{e50_s}</span></div><div style='display:flex; justify-content:space-between;'><span>EMA 200</span> <span>{e200_s}</span></div><div style='display:flex; justify-content:space-between;'><span>Volume ({vol_str})</span> <span style='color:{vol_color}'>{vol_status.split(' ')[0]}</span></div><div style='display:flex; justify-content:space-between;'><span>ATR</span> <span>{atr_s}</span></div></div>""", unsafe_allow_html=True)
             
-            # --- UPDATED: Smart Hierarchy Support System ---
+            # --- DISTANCE FILTER SETTINGS ---
+            if tf_code == "1h": min_dist = atr * 1.5
+            elif tf_code == "1wk": min_dist = atr * 5.0
+            else: min_dist = atr * 3.0 # Day default
+
             st.subheader("🚧 Key Levels (Smart Priority)")
             
-            # 1. Gather ALL Potential Supports (Candidates)
-            candidates = []
-            
-            # 1.1 EMAs (Current TF)
-            if not np.isnan(ema20) and ema20 < price: candidates.append({'val': ema20, 'label': f"EMA 20 ({tf_label} - ระยะสั้น)"})
-            if not np.isnan(ema50) and ema50 < price: candidates.append({'val': ema50, 'label': f"EMA 50 ({tf_label})"})
-            if not np.isnan(ema200) and ema200 < price: candidates.append({'val': ema200, 'label': f"EMA 200 ({tf_label} - Trend Support)"})
+            # === PART 1: SUPPORTS ===
+            candidates_supp = []
+            if not np.isnan(ema20) and ema20 < price: candidates_supp.append({'val': ema20, 'label': f"EMA 20 ({tf_label} - ระยะสั้น)"})
+            if not np.isnan(ema50) and ema50 < price: candidates_supp.append({'val': ema50, 'label': f"EMA 50 ({tf_label})"})
+            if not np.isnan(ema200) and ema200 < price: candidates_supp.append({'val': ema200, 'label': f"EMA 200 ({tf_label} - Trend Support)"})
 
-            # 1.2 Day EMAs (ถ้าดู TF อื่น ก็ให้เอา Day มาด้วยเสมอ)
             if not df_stats_day.empty:
                 d_ema50 = ta.ema(df_stats_day['Close'], length=50).iloc[-1]
                 d_ema200 = ta.ema(df_stats_day['Close'], length=200).iloc[-1]
-                if d_ema50 < price: candidates.append({'val': d_ema50, 'label': "EMA 50 (TF Day - รับระยะกลาง)"})
-                if d_ema200 < price: candidates.append({'val': d_ema200, 'label': "🛡️ EMA 200 (TF Day - รับใหญ่รายวัน)"})
-                
-                # Low 60d
+                if d_ema50 < price: candidates_supp.append({'val': d_ema50, 'label': "EMA 50 (TF Day - รับระยะกลาง)"})
+                if d_ema200 < price: candidates_supp.append({'val': d_ema200, 'label': "🛡️ EMA 200 (TF Day - รับใหญ่รายวัน)"})
                 low_60d = df_stats_day['Low'].tail(60).min()
-                if low_60d < price: candidates.append({'val': low_60d, 'label': "📉 Low 60d (ฐานสั้น)"})
+                if low_60d < price: candidates_supp.append({'val': low_60d, 'label': "📉 Low 60d (ฐานสั้น)"})
 
-            # 1.3 Week EMAs (Safety Net - Must have if below price)
             if not df_stats_week.empty:
                 w_ema50 = ta.ema(df_stats_week['Close'], length=50).iloc[-1]
                 w_ema200 = ta.ema(df_stats_week['Close'], length=200).iloc[-1]
-                if w_ema50 < price: candidates.append({'val': w_ema50, 'label': "EMA 50 (TF Week - รับระยะยาว)"})
-                if w_ema200 < price: candidates.append({'val': w_ema200, 'label': "🛡️ EMA 200 (TF Week - รับระดับกองทุน)"})
+                if w_ema50 < price: candidates_supp.append({'val': w_ema50, 'label': "EMA 50 (TF Week - รับระยะยาว)"})
+                if w_ema200 < price: candidates_supp.append({'val': w_ema200, 'label': "🛡️ EMA 200 (TF Week - รับระดับกองทุน)"})
 
-            # 1.4 Demand Zones (Filtered)
             if demand_zones:
-                for z in demand_zones:
-                    candidates.append({'val': z['bottom'], 'label': f"Demand Zone [{z['bottom']:.2f}-{z['top']:.2f}]"})
+                for z in demand_zones: candidates_supp.append({'val': z['bottom'], 'label': f"Demand Zone [{z['bottom']:.2f}-{z['top']:.2f}]"})
 
-            # 2. Sort by Price (High to Low) -> Real Ladder
-            candidates.sort(key=lambda x: x['val'], reverse=True)
+            candidates_supp.sort(key=lambda x: x['val'], reverse=True) # High -> Low for Support
 
-            # 3. Confluence Logic (Merge nearby levels)
-            merged_supports = []
+            merged_supp = []
             skip_next = False
-            for i in range(len(candidates)):
-                if skip_next: 
-                    skip_next = False; continue
-                
-                current = candidates[i]
-                # Check next item for confluence
-                if i < len(candidates) - 1:
-                    next_item = candidates[i+1]
-                    # ถ้าราคาห่างกันไม่เกิน 1% ให้มัดรวม
-                    dist_pct = (current['val'] - next_item['val']) / current['val']
-                    if dist_pct < 0.01: 
+            for i in range(len(candidates_supp)):
+                if skip_next: skip_next = False; continue
+                current = candidates_supp[i]
+                if i < len(candidates_supp) - 1:
+                    next_item = candidates_supp[i+1]
+                    if (current['val'] - next_item['val']) / current['val'] < 0.01: 
                         new_label = f"⭐ Confluence Zone ({current['label']} + {next_item['label']})"
-                        merged_supports.append({'val': current['val'], 'label': new_label})
+                        merged_supp.append({'val': current['val'], 'label': new_label})
                         skip_next = True
                         continue
-                
-                merged_supports.append(current)
+                merged_supp.append(current)
 
-            # 4. Filter Proximity (Visual Clean up) & Limit
-            # โชว์เฉพาะ 5 อันดับแรกที่ใกล้ราคาที่สุด
-            final_show = []
-            for item in merged_supports:
-                # ถ้าห่างเกิน 30% ไม่ต้องโชว์ (ไกลไป) ยกเว้น EMA Week 200
-                if (price - item['val']) / price < 0.30 or "EMA 200 (TF Week" in item['label']:
-                    final_show.append(item)
-            
+            final_show_supp = []
+            for item in merged_supp:
+                if (price - item['val']) / price > 0.30 and "EMA 200 (TF Week" not in item['label']: continue
+                if not final_show_supp: final_show_supp.append(item)
+                else:
+                    last_item = final_show_supp[-1]
+                    if abs(last_item['val'] - item['val']) >= min_dist: final_show_supp.append(item)
+
             st.markdown("#### 🟢 แนวรับ (Support Hierarchy)"); 
-            if final_show: 
-                for item in final_show[:5]: 
-                    st.write(f"- **{item['val']:.2f} :** {item['label']}")
-            else: 
-                st.error("🚨 ราคาหลุดทุกแนวรับสำคัญ! (All Time Low?)")
+            if final_show_supp: 
+                for item in final_show_supp[:4]: st.write(f"- **{item['val']:.2f} :** {item['label']}")
+            else: st.error("🚨 ราคาหลุดทุกแนวรับสำคัญ! (All Time Low?)")
 
-            # Resistances
-            potential_resistances = [(ema20, "EMA 20"), (ema200, "EMA 200"), (bb_upper, "BB Upper")]
-            raw_resistances = sorted([x for x in potential_resistances if not np.isnan(x[0]) and x[0] > price], key=lambda x: x[0])
-            valid_resistances = filter_levels(raw_resistances)
-            st.markdown("#### 🔴 แนวต้าน (Resistance)"); 
-            if valid_resistances: 
-                for v, d in valid_resistances[:2]: st.write(f"- **{v:.2f}** : {d}")
+            # === PART 2: RESISTANCES (NEW & UPGRADED) ===
+            candidates_res = []
+            # Current TF
+            if not np.isnan(ema20) and ema20 > price: candidates_res.append({'val': ema20, 'label': f"EMA 20 ({tf_label} - ต้านสั้น)"})
+            if not np.isnan(ema50) and ema50 > price: candidates_res.append({'val': ema50, 'label': f"EMA 50 ({tf_label})"})
+            if not np.isnan(ema200) and ema200 > price: candidates_res.append({'val': ema200, 'label': f"EMA 200 ({tf_label} - ต้านใหญ่)"})
+            if not np.isnan(bb_upper) and bb_upper > price: candidates_res.append({'val': bb_upper, 'label': f"BB Upper ({tf_label} - เพดาน)"})
+            
+            # Day TF
+            if not df_stats_day.empty:
+                d_ema50 = ta.ema(df_stats_day['Close'], length=50).iloc[-1]
+                if d_ema50 > price: candidates_res.append({'val': d_ema50, 'label': "EMA 50 (TF Day)"})
+                high_60d = df_stats_day['High'].tail(60).max()
+                if high_60d > price: candidates_res.append({'val': high_60d, 'label': "🏔️ High 60d (ดอย 3 เดือน)"})
+
+            # Week TF (Safety Net)
+            if not df_stats_week.empty:
+                w_ema50 = ta.ema(df_stats_week['Close'], length=50).iloc[-1]
+                w_ema200 = ta.ema(df_stats_week['Close'], length=200).iloc[-1]
+                if w_ema50 > price: candidates_res.append({'val': w_ema50, 'label': "EMA 50 (TF Week - ต้านระยะยาว)"})
+                if w_ema200 > price: candidates_res.append({'val': w_ema200, 'label': "🛡️ EMA 200 (TF Week - ต้านระดับกองทุน)"})
+                
+            # Supply Zones (Swing Highs)
+            if supply_zones:
+                for z in supply_zones: candidates_res.append({'val': z['top'], 'label': f"Supply Zone [{z['bottom']:.2f}-{z['top']:.2f}]"})
+
+            candidates_res.sort(key=lambda x: x['val']) # Low -> High for Resistance (Closest first)
+
+            merged_res = []
+            skip_next = False
+            for i in range(len(candidates_res)):
+                if skip_next: skip_next = False; continue
+                current = candidates_res[i]
+                if i < len(candidates_res) - 1:
+                    next_item = candidates_res[i+1]
+                    if (next_item['val'] - current['val']) / current['val'] < 0.01:
+                        new_label = f"⭐ Confluence Zone ({current['label']} + {next_item['label']})"
+                        merged_res.append({'val': current['val'], 'label': new_label})
+                        skip_next = True
+                        continue
+                merged_res.append(current)
+
+            final_show_res = []
+            for item in merged_res:
+                if (item['val'] - price) / price > 0.30 and "EMA 200 (TF Week" not in item['label']: continue
+                if not final_show_res: final_show_res.append(item)
+                else:
+                    last_item = final_show_res[-1]
+                    if abs(item['val'] - last_item['val']) >= min_dist: final_show_res.append(item)
+
+            st.markdown("#### 🔴 แนวต้าน (Resistance Hierarchy)"); 
+            if final_show_res: 
+                for item in final_show_res[:4]: st.write(f"- **{item['val']:.2f} :** {item['label']}")
             else: st.write("- N/A (Blue Sky)")
 
         with c_ai:
