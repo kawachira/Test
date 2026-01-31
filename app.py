@@ -589,14 +589,11 @@ if submit_btn:
 
     if df is not None and not df.empty and len(df) > 10: 
         # Calculations
-                # --- 1. ส่วนการคำนวณ (เริ่มประมาณบรรทัดที่ 465) ---
         df['EMA20'] = ta.ema(df['Close'], length=20)
-        df['EMA50'] = ta.ema(df['Close'], length=50) # เพิ่ม EMA 50
+        df['EMA50'] = ta.ema(df['Close'], length=50) # คำนวณ EMA 50
         df['EMA200'] = ta.ema(df['Close'], length=200)
         df['RSI'] = ta.rsi(df['Close'], length=14)
         df['ATR'] = ta.atr(df['High'], df['Low'], df['Close'], length=14)
-        
-        # ... (ส่วน MACD / BBands / ADX คงเดิมตามโค้ดคุณ) ...
         macd = ta.macd(df['Close']); df = pd.concat([df, macd], axis=1)
         bbands = ta.bbands(df['Close'], length=20, std=2)
         if bbands is not None and len(bbands.columns) >= 3:
@@ -604,56 +601,248 @@ if submit_btn:
             df = pd.concat([df, bbands], axis=1)
         else: bbl_col_name, bbu_col_name = None, None
         adx = ta.adx(df['High'], df['Low'], df['Close'], length=14); df = pd.concat([df, adx], axis=1)
+        df['Vol_SMA20'] = ta.sma(df['Volume'], length=20)
         
-        # ดึงค่าล่าสุดมาแสดงผล
-        last = df.iloc[-1]
-        ema50 = last['EMA50'] if 'EMA50' in last else np.nan # ดึงค่า EMA 50 ล่าสุด
+        # OBV & Rolling Logic
+        df['OBV'] = ta.obv(df['Close'], df['Volume'])
+        df['OBV_SMA20'] = ta.sma(df['OBV'], length=20)
+        df['OBV_Slope'] = ta.slope(df['OBV'], length=5) 
+        df['Rolling_Min'] = df['Low'].rolling(window=20).min()
+        df['Rolling_Max'] = df['High'].rolling(window=20).max()
 
-        # --- 2. ส่วนการแสดงผลตาราง Technical Indicators ---
+        # Last Values
+        last = df.iloc[-1]
+        price = info.get('regularMarketPrice') if info.get('regularMarketPrice') else last['Close']
+        rsi = last['RSI'] if 'RSI' in last else np.nan
+        atr = last['ATR'] if 'ATR' in last else np.nan
+        ema20 = last['EMA20'] if 'EMA20' in last else np.nan
+        ema50 = last['EMA50'] if 'EMA50' in last else np.nan # ดึงค่า EMA 50
+        ema200 = last['EMA200'] if 'EMA200' in last else np.nan
+        vol_now = last['Volume']
+        open_p = last['Open']; high_p = last['High']; low_p = last['Low']; close_p = last['Close']
+        try: macd_val, macd_signal = last['MACD_12_26_9'], last['MACDs_12_26_9']
+        except: macd_val, macd_signal = np.nan, np.nan
+        try: adx_val = last['ADX_14']
+        except: adx_val = np.nan
+        if bbu_col_name and bbl_col_name: bb_upper, bb_lower = last[bbu_col_name], last[bbl_col_name]
+        else: bb_upper, bb_lower = price * 1.05, price * 0.95
+        vol_status, vol_color = analyze_volume(last, last['Vol_SMA20'])
+        
+        try: obv_val = last['OBV']; obv_avg = last['OBV_SMA20']
+        except: obv_val = np.nan; obv_avg = np.nan
+        
+        obv_slope_val = last.get('OBV_Slope', np.nan)
+        rolling_min_val = last.get('Rolling_Min', np.nan)
+        rolling_max_val = last.get('Rolling_Max', np.nan)
+
+        mtf_trend = "Sideway"; mtf_ema200_val = 0
+        if df_mtf is not None and not df_mtf.empty:
+            if 'EMA200' not in df_mtf.columns:
+                 df_mtf['EMA200'] = ta.ema(df_mtf['Close'], length=200)
+            if len(df_mtf) > 200 and not pd.isna(df_mtf['EMA200'].iloc[-1]):
+                mtf_ema200_val = df_mtf['EMA200'].iloc[-1]
+                if df_mtf['Close'].iloc[-1] > mtf_ema200_val: mtf_trend = "Bullish"
+                else: mtf_trend = "Bearish"
+        
+        try:
+            prev_open = df['Open'].iloc[-2]
+            prev_close = df['Close'].iloc[-2]
+            vol_avg = last['Vol_SMA20']
+        except:
+            prev_open = 0; prev_close = 0; vol_avg = 1
+
+        ai_report = ai_hybrid_analysis(price, ema20, ema50, ema200, rsi, macd_val, macd_signal, adx_val, bb_upper, bb_lower, 
+                                       vol_status, mtf_trend, atr, mtf_ema200_val,
+                                       open_p, high_p, low_p, close_p, obv_val, obv_avg,
+                                       obv_slope_val, rolling_min_val, rolling_max_val,
+                                       prev_open, prev_close, vol_now, vol_avg)
+
+        # Log
+        current_time = datetime.now().strftime("%H:%M:%S")
+        log_entry = { "เวลา": current_time, "หุ้น": symbol_input, "ราคา": f"{price:.2f}", "Score": f"{ai_report['status_color'].upper()}", "คำแนะนำ": ai_report['banner_title'].split(':')[0], "Action": ai_report['strategy'] }
+        st.session_state['history_log'].insert(0, log_entry)
+        if len(st.session_state['history_log']) > 10: st.session_state['history_log'] = st.session_state['history_log'][:10]
+
+        # DISPLAY
+        logo_url = f"https://financialmodelingprep.com/image-stock/{symbol_input}.png"
+        fallback_url = "https://cdn-icons-png.flaticon.com/512/720/720453.png"
+        icon_html = f"""<img src="{logo_url}" onerror="this.onerror=null; this.src='{fallback_url}';" style="height: 50px; width: 50px; border-radius: 50%; vertical-align: middle; margin-right: 10px; object-fit: contain; background-color: white; border: 1px solid #e0e0e0; padding: 2px;">"""
+        st.markdown(f"<h2 style='text-align: center; margin-top: -15px; margin-bottom: 25px;'>{icon_html} {info['longName']} ({symbol_input})</h2>", unsafe_allow_html=True)
+
+        # --- Market Status Bar ---
+        m_state = info.get('marketState', '').upper()
+        last_date_str = df.index[-1].strftime('%d %b %Y')
+        if m_state == "REGULAR":
+            st_msg = "🟢 **Market Open:** กำลังวิเคราะห์ Real-time..."
+            st_bg = "#dcfce7"; st_color = "#166534"
+        elif m_state in ["PRE", "PREPRE"]:
+            st_msg = "🟠 **Pre-Market:** ตลาดกำลังจะเปิด (ข้อมูล Gap/RSI ยังอิงจากปิดวันก่อน)"
+            st_bg = "#ffedd5"; st_color = "#9a3412"
+        elif m_state in ["POST", "POSTPOST"]:
+            st_msg = "🌙 **Post-Market:** ปิดตลาดแล้ว (ราคาขยับนอกเวลาทำการ)"
+            st_bg = "#e0e7ff"; st_color = "#3730a3"
+        else: # CLOSED
+            st_msg = f"🔴 **Market Closed:** วิเคราะห์จากข้อมูลปิดตลาดวันที่ {last_date_str}"
+            st_bg = "#fee2e2"; st_color = "#991b1b"
+            
+        st.markdown(f"""
+        <div style="text-align: center; margin-bottom: 20px;">
+            <div style="background-color: {st_bg}; color: {st_color}; padding: 8px 20px; border-radius: 30px; font-size: 0.95rem; font-weight: 600; display: inline-block; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
+                {st_msg}
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+        # -------------------------
+
+        c1, c2 = st.columns(2)
+        with c1:
+            reg_price, reg_chg = info.get('regularMarketPrice'), info.get('regularMarketChange')
+            if reg_price and reg_chg: prev_c = reg_price - reg_chg; reg_pct = (reg_chg / prev_c) * 100 if prev_c != 0 else 0.0
+            else: reg_pct = 0.0
+            color_text = "#16a34a" if reg_chg and reg_chg > 0 else "#dc2626"; bg_color = "#e8f5ec" if reg_chg and reg_chg > 0 else "#fee2e2"
+            st.markdown(f"""<div style="margin-bottom:5px; display: flex; align-items: center; gap: 15px; flex-wrap: wrap;"><div style="font-size:40px; font-weight:600; line-height: 1;">{reg_price:,.2f} <span style="font-size: 20px; color: #6b7280; font-weight: 400;">USD</span></div><div style="display:inline-flex; align-items:center; gap:6px; background:{bg_color}; color:{color_text}; padding:4px 12px; border-radius:999px; font-size:18px; font-weight:500;">{arrow_html(reg_chg)} {reg_chg:+.2f} ({reg_pct:.2f}%)</div></div>""", unsafe_allow_html=True)
+            def make_pill(change, percent): color = "#16a34a" if change >= 0 else "#dc2626"; bg = "#e8f5ec" if change >= 0 else "#fee2e2"; arrow = "▲" if change >= 0 else "▼"; return f'<span style="background:{bg}; color:{color}; padding: 2px 8px; border-radius: 10px; font-size: 12px; font-weight: 600; margin-left: 8px;">{arrow} {change:+.2f} ({percent:.2f}%)</span>'
+            ohlc_html = ""; 
+            if m_state != "REGULAR": 
+                d_open = info.get('regularMarketOpen'); d_high = info.get('dayHigh'); d_low = info.get('dayLow'); d_close = info.get('regularMarketPrice')
+                if d_open and d_high and d_low and d_close: day_chg = info.get('regularMarketChange', 0); val_color = "#16a34a" if day_chg >= 0 else "#dc2626"; ohlc_html = f"""<div style="font-size: 12px; font-weight: 600; margin-bottom: 5px; font-family: 'Source Sans Pro', sans-serif; white-space: nowrap; overflow-x: auto;"><span style="margin-right: 5px; opacity: 0.7;">O</span><span style="color: {val_color}; margin-right: 12px;">{d_open:.2f}</span><span style="margin-right: 5px; opacity: 0.7;">H</span><span style="color: {val_color}; margin-right: 12px;">{d_high:.2f}</span><span style="margin-right: 5px; opacity: 0.7;">L</span><span style="color: {val_color}; margin-right: 12px;">{d_low:.2f}</span><span style="margin-right: 5px; opacity: 0.7;">C</span><span style="color: {val_color};">{d_close:.2f}</span></div>"""
+            pre_post_html = ""
+            if info.get('preMarketPrice') and info.get('preMarketChange'): p = info.get('preMarketPrice'); c = info.get('preMarketChange'); prev_p = p - c; pct = (c / prev_p) * 100 if prev_p != 0 else 0; pre_post_html += f'<div style="margin-bottom: 6px; font-size: 12px;">☀️ Pre: <b>{p:.2f}</b> {make_pill(c, pct)}</div>'
+            if info.get('postMarketPrice') and info.get('postMarketChange'): p = info.get('postMarketPrice'); c = info.get('postMarketChange'); prev_p = p - c; pct = (c / prev_p) * 100 if prev_p != 0 else 0; pre_post_html += f'<div style="margin-bottom: 6px; font-size: 12px;">🌙 Post: <b>{p:.2f}</b> {make_pill(c, pct)}</div>'
+            if ohlc_html or pre_post_html: st.markdown(f'<div style="margin-top: -5px; margin-bottom: 15px;">{ohlc_html}{pre_post_html}</div>', unsafe_allow_html=True)
+
+        if tf_code == "1h": tf_label = "TF Hour"
+        elif tf_code == "1wk": tf_label = "TF Week"
+        else: tf_label = "TF Day"
+        st_color = ai_report["status_color"]
+        main_status = ai_report["banner_title"]
+        if st_color == "green": c2.success(f"📈 {main_status}\n\n**{tf_label}**")
+        elif st_color == "red": c2.error(f"📉 {main_status}\n\n**{tf_label}**")
+        else: c2.warning(f"⚖️ {main_status}\n\n**{tf_label}**")
+
+        c3, c4, c5 = st.columns(3)
+        icon_up_svg = """<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#16a34a" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5"/><path d="M5 12l7-7 7 7"/></svg>"""
+        icon_down_svg = """<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#dc2626" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14"/><path d="M5 12l7 7 7-7"/></svg>"""
+        icon_flat_svg = """<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="#a3a3a3"><circle cx="12" cy="12" r="10"/></svg>"""
+        
+        with c3:
+            fund_data = analyze_fundamental(info)
+            next_earn_date = info.get('nextEarnings', 'N/A')
+            st.markdown(f"""<div style="margin-bottom: 5px; font-weight: 700; opacity: 0.9; font-size: 18px;">📊 Fundamental</div>""", unsafe_allow_html=True)
+            with st.expander(f"{fund_data['status']} (Click)", expanded=False):
+                st.markdown(f"""
+                <div class='fund-box {fund_data['color_class']}'>
+                    <div style='font-weight:bold; font-size:1.1em; margin-bottom:5px;'>{fund_data['summary']}</div>
+                    <div>• <b>P/E Ratio:</b> {fund_data['pe']}</div>
+                    <div>• <b>EPS Growth:</b> {fund_data['growth']}</div>
+                    <div>• <b>Next Earnings:</b> {next_earn_date}</div>
+                    <hr style='margin: 5px 0; border-color: rgba(0,0,0,0.1);'>
+                    <div style='font-style:italic;'>💡 {fund_data['advice']}</div>
+                </div>
+                """, unsafe_allow_html=True)
+
+        with c4:
+            rsi_str = f"{rsi:.2f}" if not np.isnan(rsi) else "N/A"; rsi_text = get_rsi_interpretation(rsi)
+            st.markdown(custom_metric_html("⚡ RSI (14)", rsi_str, rsi_text, "gray", icon_flat_svg), unsafe_allow_html=True)
+        with c5:
+            ema200_disp = float(ema200) if not np.isnan(ema200) else np.nan
+            price_disp = float(price) if not np.isnan(price) else np.nan
+            adx_disp = float(adx_val) if not np.isnan(adx_val) else np.nan
+            is_uptrend = price_disp >= ema200_disp if not np.isnan(ema200_disp) and not np.isnan(price_disp) else True
+            adx_text = get_adx_interpretation(adx_disp, is_uptrend)
+            adx_str = f"{adx_disp:.2f}" if not np.isnan(adx_disp) else "N/A"
+            st.markdown(custom_metric_html("💪 ADX Strength", adx_str, adx_text, "gray", icon_flat_svg), unsafe_allow_html=True)
+        
+        st.write("") 
+        c_ema, c_ai = st.columns([1.5, 2])
         with c_ema:
             st.subheader("📉 Technical Indicators")
+            # --- แก้ไข: เพิ่มการแสดงผล EMA 50 ---
             vol_str = format_volume(vol_now)
             e20_s = f"{ema20:.2f}" if not np.isnan(ema20) else "N/A"
-            e50_s = f"{ema50:.2f}" if not np.isnan(ema50) else "N/A" # แสดงผล EMA 50
+            e50_s = f"{ema50:.2f}" if not np.isnan(ema50) else "N/A" # เพิ่มตัวแปร
             e200_s = f"{ema200:.2f}" if not np.isnan(ema200) else "N/A"
-            atr_s = f"{atr:.2f} ({ (atr/price)*100 if price>0 else 0:.1f}%)"
+            atr_pct = (atr / price) * 100 if not np.isnan(atr) and price > 0 else 0; atr_s = f"{atr:.2f} ({atr_pct:.1f}%)" if not np.isnan(atr) else "N/A"; macd_s = f"{macd_val:.3f}" if not np.isnan(macd_val) else "N/A"
+            # เพิ่มบรรทัด EMA 50 ใน HTML
+            st.markdown(f"""<div style='background-color: var(--secondary-background-color); padding: 15px; border-radius: 10px; font-size: 0.95rem;'><div style='display:flex; justify-content:space-between; margin-bottom:5px; border-bottom:1px solid #ddd; font-weight:bold;'><span>Indicator</span> <span>Value</span></div><div style='display:flex; justify-content:space-between;'><span>EMA 20</span> <span>{e20_s}</span></div><div style='display:flex; justify-content:space-between;'><span>EMA 50</span> <span>{e50_s}</span></div><div style='display:flex; justify-content:space-between;'><span>EMA 200</span> <span>{e200_s}</span></div><div style='display:flex; justify-content:space-between;'><span>MACD</span> <span>{macd_s}</span></div><div style='display:flex; justify-content:space-between;'><span>Volume ({vol_str})</span> <span style='color:{vol_color}'>{vol_status.split(' ')[0]}</span></div><div style='display:flex; justify-content:space-between;'><span>ATR</span> <span>{atr_s}</span></div></div>""", unsafe_allow_html=True)
             
-            st.markdown(f"""<div style='background-color: var(--secondary-background-color); padding: 15px; border-radius: 10px; font-size: 0.95rem;'><div style='display:flex; justify-content:space-between; margin-bottom:5px; border-bottom:1px solid #ddd; font-weight:bold;'><span>Indicator</span> <span>Value</span></div><div style='display:flex; justify-content:space-between;'><span>EMA 20</span> <span>{e20_s}</span></div><div style='display:flex; justify-content:space-between;'><span>EMA 50</span> <span>{e50_s}</span></div><div style='display:flex; justify-content:space-between;'><span>EMA 200</span> <span>{e200_s}</span></div><div style='display:flex; justify-content:space-between;'><span>MACD</span> <span>{macd_val:.3f}</span></div><div style='display:flex; justify-content:space-between;'><span>Volume ({vol_str})</span> <span style='color:{vol_color}'>{vol_status.split(' ')[0]}</span></div><div style='display:flex; justify-content:space-between;'><span>ATR</span> <span>{atr_s}</span></div></div>""", unsafe_allow_html=True)
-
-            # --- 3. ส่วนแนวรับ Smart Support (Logic ใหม่ตามสั่ง) ---
+            # --- MODIFIED: Smart Support Logic (Sorted & MTF Added) ---
             st.subheader("🚧 Key Levels (Smart Support)")
             
-            # คำนวณ EMA 50 ของ Timeframe ใหญ่ (MTF)
+            # 1. Prepare Data & Calc MTF EMA 50
             if df_mtf is not None and not df_mtf.empty:
-                df_mtf['EMA50_MTF'] = ta.ema(df_mtf['Close'], length=50)
-                mtf_ema50 = df_mtf['EMA50_MTF'].iloc[-1]
-                mtf_ema200 = df_mtf['EMA200'].iloc[-1] if 'EMA200' in df_mtf.columns else np.nan
+                df_mtf['EMA50'] = ta.ema(df_mtf['Close'], length=50)
+                mtf_ema50_val = df_mtf['EMA50'].iloc[-1]
             else:
-                mtf_ema50 = np.nan; mtf_ema200 = np.nan
+                mtf_ema50_val = np.nan
+            
+            # Dynamic Labels based on Timeframe
+            if tf_code == "1d": 
+                label_mtf_50 = "EMA 50 Week (รับระยะกลาง)"
+                label_mtf_200 = "🛡️ EMA 200 Week (รับระดับกองทุน)"
+            elif tf_code == "1h": 
+                label_mtf_50 = "EMA 50 Day (รับรายวัน)"
+                label_mtf_200 = "🛡️ EMA 200 Day (รับใหญ่รายวัน)"
+            else:
+                label_mtf_50 = f"EMA 50 {mtf_code.upper()}"
+                label_mtf_200 = f"EMA 200 {mtf_code.upper()}"
 
-            # กำหนดชื่อเรียก TF ถัดไป
-            next_tf = "Day" if tf_code == "1h" else ("Week" if tf_code == "1d" else "Month")
+            # Calculate Price Floor
+            if tf_code == "1h": 
+                window_1y = 252 * 7 # 1 year ~ 252 trading days * 7 hours
+            else: 
+                window_1y = 252
 
-            # จัดกลุ่มแนวรับตามลำดับ (Current TF -> Higher TF)
+            low_60d = df['Low'].tail(60).min()
+            low_52w = df['Low'].tail(window_1y).min()
+            major_low = df['Low'].min() 
+
+            # 2. Raw List (Nearest First Logic will sort this)
             potential_supports = [
-                (ema20, "EMA 20 (Momentum)"),
-                (ema50, "EMA 50 (Trend Line)"),
-                (bb_lower, "BB Lower (กรอบล่าง)"),
-                (ema200, "EMA 200 (แนวรับหลัก TF ปัจจุบัน)"),
-                (mtf_ema50, f"🛡️ EMA 50 {next_tf} (แนวรับใหญ่ถัดไป)"),
-                (mtf_ema200, f"🏰 EMA 200 {next_tf} (กำแพงสุดท้าย)"),
-                (df['Low'].tail(60).min(), "Low 60d (ฐานราคา)")
+                (bb_lower, "BB Lower (กรอบล่าง)"), 
+                (ema200, "EMA 200 (TF ปัจจุบัน)"),
+                (ema50, "EMA 50 (ระยะกลาง)"), # เพิ่ม EMA 50 ปัจจุบันเข้าไปด้วย
+                (ema20, "EMA 20 (TF ปัจจุบัน)"),
+                (low_60d, "Low 60d (ฐานสั้น)"),           
+                (mtf_ema50_val, label_mtf_50),    # <--- Logic นี้จะดึงค่าจาก TF ใหญ่อัตโนมัติ (H->D, D->W)
+                (mtf_ema200_val, label_mtf_200),    
+                (low_52w, "📉 52-Week Low (ฐานปี)"),       
+                (major_low, "💎 Major Low (ฐาน 5 ปี)")       
             ]
+            
+            # 3. Filter & Sort (Highest Value below price = Nearest Support)
+            valid_supports = []
+            seen_values = set()
+            
+            # Sort Descending: Highest price first (closest to current price)
+            potential_supports.sort(key=lambda x: x[0] if not np.isnan(x[0]) else -1, reverse=True)
 
-            # กรองและเรียงลำดับจากใกล้ไปไกล (ราคามากไปหาน้อย)
-            valid_supports = sorted([x for x in potential_supports if not np.isnan(x[0]) and x[0] < price], key=lambda x: x[0], reverse=True)
+            for val, label in potential_supports:
+                if np.isnan(val): continue
+                if val < price: # Must be below current price
+                    # Check for duplicates (within 0.5% difference)
+                    is_duplicate = False
+                    for seen_val in seen_values:
+                        if abs(val - seen_val) / seen_val < 0.005: 
+                            is_duplicate = True
+                            break
+                    if not is_duplicate:
+                        valid_supports.append((val, label))
+                        seen_values.add(val)
 
-            st.markdown("#### 🟢 แนวรับถัดไป (เรียงตามลำดับ)"); 
+            # 4. Display Top 4
+            st.markdown("#### 🟢 แนวรับถัดไป"); 
             if valid_supports: 
                 for v, d in valid_supports[:4]: 
                     st.write(f"- **{v:.2f}** : {d}")
             else: 
-                st.error(f"🚨 ราคาหลุดทุกแนวรับสำคัญ! (All Time Low)")
+                # Fallback
+                if price > 100: step = 10
+                elif price > 10: step = 1
+                else: step = 0.5
+                next_round = (int(price / step) * step)
+                st.error(f"🚨 หลุดทุกแนวรับสำคัญ! (All Time Low) แนวรับจิตวิทยาถัดไป: {next_round:.2f}")
+
             # Resistances (Keep Original)
             potential_resistances = [(ema20, "EMA 20"), (ema200, "EMA 200"), (bb_upper, "BB Upper"), (df['High'].tail(60).max(), "High 60d")]
             raw_resistances = sorted([x for x in potential_resistances if not np.isnan(x[0]) and x[0] > price and x[0] > 0], key=lambda x: x[0])
@@ -710,4 +899,3 @@ if submit_btn:
         display_learning_section(rsi, rsi_interp_str, macd_val, macd_signal, macd_interp_str, adx_val, price, ema200, bb_upper, bb_lower)
 
     else: st.error("ไม่พบข้อมูลหุ้น")
-
