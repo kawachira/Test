@@ -171,6 +171,18 @@ def get_adx_interpretation(adx, is_uptrend):
     if adx >= 20: return "Developing Trend (เริ่มก่อตัว)"
     return "Weak/Sideway (ตลาดไร้ทิศทาง)"
 
+def filter_levels(levels, threshold_pct=0.025):
+    selected = []
+    for val, label in levels:
+        if np.isnan(val): continue
+        label = label.replace("BB Lower (Volatility)", "BB Lower (กรอบล่าง)").replace("Low 60 Days (Price Action)", "Low 60 วัน (ฐานราคา)").replace("EMA 200 (Trend Wall)", "EMA 200 (เทรนด์หลัก)").replace("EMA 50 (Short Trend)", "EMA 50 (ระยะกลาง)").replace("EMA 20 (Momentum)", "EMA 20 (โมเมนตัม)").replace("BB Upper (Ceiling)", "BB Upper (ต้านใหญ่)").replace("High 60 Days (Peak)", "High 60 วัน (ยอดดอย)")
+        if "MTF" in label or "1wk" in label.lower() or "1mo" in label.lower(): label = "EMA 200 (TF ใหญ่)"
+        if not selected: selected.append((val, label))
+        else:
+            last_val = selected[-1][0]; diff = abs(val - last_val) / last_val
+            if diff > threshold_pct: selected.append((val, label))
+    return selected
+
 # --- NEW: Fundamental Analysis Function ---
 def analyze_fundamental(info):
     pe = info.get('trailingPE', None)
@@ -340,13 +352,13 @@ def analyze_volume(row, vol_ma):
     else: # ระดับ 2: ปกติ
         return f"☁️ ปกติ ({pct:.0f}%)", "gray" # สีเทา
 
-# --- 7. AI Decision Engine (Hybrid SMC + Smart OBV) ---
+# --- 7. AI Decision Engine (Detailed Insight Version) ---
 def ai_hybrid_analysis(price, ema20, ema50, ema200, rsi, macd_val, macd_sig, adx, bb_up, bb_low, 
                        vol_status, mtf_trend, atr_val, mtf_ema200_val,
                        open_price, high, low, close, obv_val, obv_avg,
                        obv_slope, rolling_min, rolling_max,
                        prev_open, prev_close, vol_now, vol_avg, demand_zones,
-                       is_squeeze): # Added is_squeeze param
+                       is_squeeze):
 
     def safe_float(x):
         try: return float(x) if not np.isnan(float(x)) else np.nan
@@ -360,143 +372,148 @@ def ai_hybrid_analysis(price, ema20, ema50, ema200, rsi, macd_val, macd_sig, adx
     candle_pattern, candle_color, candle_detail, is_big_candle = analyze_candlestick(open_price, high, low, close)
     is_reversal_candle = "Hammer" in candle_pattern or "Doji" in candle_pattern
     
-    # Extract Volume Grade Color from analyze_volume result
+    # Extract Volume Grade
     vol_grade_text, vol_grade_color = analyze_volume({'Volume': vol_now}, vol_avg)
 
     # 2. SMC Location Check
     in_demand_zone = False
     active_zone = None
-    
     if demand_zones:
         for zone in demand_zones:
             if (low <= zone['top'] * 1.005) and (high >= zone['bottom']):
-                in_demand_zone = True
-                active_zone = zone
-                break
+                in_demand_zone = True; active_zone = zone; break
     
-    # 3. Confluence Check (Zone + EMA)
-    is_confluence = False
-    confluence_msg = ""
+    # 3. Confluence Check
+    is_confluence = False; confluence_msg = ""
     if in_demand_zone:
-        if abs(active_zone['bottom'] - ema200) / price < 0.02: 
-            is_confluence = True; confluence_msg = "Zone + EMA 200"
-        elif abs(active_zone['bottom'] - ema50) / price < 0.02:
-            is_confluence = True; confluence_msg = "Zone + EMA 50"
+        if abs(active_zone['bottom'] - ema200) / price < 0.02: is_confluence = True; confluence_msg = "Zone + EMA 200"
+        elif abs(active_zone['bottom'] - ema50) / price < 0.02: is_confluence = True; confluence_msg = "Zone + EMA 50"
 
     # --- SCORING SYSTEM ---
     score = 0
     bullish_factors = []
     bearish_factors = []
-    situation_insight = "ตลาดแกว่งตัวตามปกติ"
     
-    # Trend Score
-    trend_is_up = False
+    # --- 4. DETAILED FACTOR COLLECTION (เก็บทุกเม็ด) ---
+    
+    # A. Trend Structure (EMA)
     if not np.isnan(ema200):
-        if price > ema200: score += 1; trend_is_up = True
-        else: score -= 1 
-    
-    # --- 🌟 NEW: Smart OBV Logic (Divergence Detection) ---
-    has_bullish_div = False
-    has_bearish_div = False
-    obv_insight = "Volume Flow ปกติ (ตามเทรนด์)"
-    
-    # เราใช้ Slope 5 วันในการดูทิศทาง
-    price_slope = 1 if close > prev_close else -1 # Simple slope direction
-    
-    if not np.isnan(obv_slope):
-        # Bullish Divergence: ราคาลง (หรือนิ่ง) แต่ OBV ชันขึ้น (เจ้าเก็บ)
-        if price < ema20 and obv_slope > 0:
-            has_bullish_div = True
-            score += 2
-            bullish_factors.append("💎 **Smart OBV:** เจอ Bullish Divergence (ราคาลงแต่เจ้าเก็บของ)")
-            obv_insight = "Bullish Divergence (สะสมพลัง)"
+        if price > ema200: 
+            score += 2; bullish_factors.append("ยืนเหนือ EMA 200 (เทรนด์หลักขาขึ้น)")
+        else: 
+            score -= 2; bearish_factors.append("หลุด EMA 200 (เทรนด์หลักขาลง)")
             
-        # Bearish Divergence: ราคาขึ้น แต่ OBV ปักลง (เจ้าออกของ)
+    if not np.isnan(ema50):
+        if price > ema50: score += 1; bullish_factors.append("ยืนเหนือ EMA 50 (ระยะกลางแกร่ง)")
+        else: score -= 1; bearish_factors.append("หลุด EMA 50 (ระยะกลางเสียทรง)")
+        
+    if not np.isnan(ema20):
+        if price < ema20: score -= 1; bearish_factors.append("หลุด EMA 20 (ระยะสั้นลง)")
+    
+    # B. Momentum (MACD & RSI)
+    if not np.isnan(macd_val) and not np.isnan(macd_sig):
+        if macd_val > macd_sig: bullish_factors.append(f"MACD ตัดขึ้น (Momentum บวก)")
+        else: score -= 1; bearish_factors.append(f"MACD ตัดลง (Momentum ลบ)")
+        
+    if rsi < 30: 
+        score += 1; bullish_factors.append(f"RSI Oversold ({rsi:.0f}) - ขายมากเกินไป")
+    elif rsi > 70: 
+        score -= 1; bearish_factors.append(f"RSI Overbought ({rsi:.0f}) - ซื้อมากเกินไป")
+
+    # C. Multi-Timeframe
+    if mtf_trend == "Bullish": 
+        score += 1; bullish_factors.append("TF ใหญ่เป็นขาขึ้น (Major Uptrend)")
+    else:
+        bearish_factors.append("TF ใหญ่เป็นขาลง (Major Downtrend)")
+
+    # --- 5. SMART LOGIC & OVERRIDES ---
+    
+    situation_insight = "" # รอเติมตามสถานการณ์
+    
+    # Smart OBV
+    has_bullish_div = False; has_bearish_div = False; obv_insight = "Volume Flow ปกติ (ตามเทรนด์)"
+    if not np.isnan(obv_slope):
+        if price < ema20 and obv_slope > 0:
+            has_bullish_div = True; score += 2
+            bullish_factors.append("💎 Smart OBV: เกิด Bullish Divergence (เจ้าเก็บของ)")
+            obv_insight = "Bullish Divergence (สะสมพลัง)"
         elif price > ema20 and obv_slope < 0:
-            has_bearish_div = True
-            score -= 2
-            bearish_factors.append("⚠️ **Smart OBV:** เจอ Bearish Divergence (ราคาขึ้นแต่ไส้ในกลวง)")
+            has_bearish_div = True; score -= 2
+            bearish_factors.append("⚠️ Smart OBV: เกิด Bearish Divergence (เจ้าออกของ)")
             obv_insight = "Bearish Divergence (ระวังทุบ)"
 
-    # --- 🌟 NEW: Squeeze Logic Integration ---
+    # Squeeze
     if is_squeeze:
         situation_insight = "💣 **BB Squeeze:** กราฟบีบอัดรุนแรง รอระเบิดเลือกทาง!"
-        # ถ้ามี Squeeze ให้ดู OBV ประกอบเพื่อทายทางระเบิด
-        if has_bullish_div:
-            score += 1
-            situation_insight += " (แนวโน้มระเบิดขึ้นสูง 🚀)"
-        elif has_bearish_div:
-            score -= 1
-            situation_insight += " (แนวโน้มระเบิดลงสูง 🩸)"
+        if has_bullish_div: score += 1; situation_insight += " (แนวโน้มระเบิดขึ้น 🚀)"
+        elif has_bearish_div: score -= 1; situation_insight += " (แนวโน้มระเบิดลง 🩸)"
 
-    # --- SMC Logic ---
+    # SMC & Volume Logic
     if in_demand_zone:
-        # Check Volume Condition for Demand Zone
         is_vol_safe = "ต่ำ" in vol_grade_text or "ปกติ" in vol_grade_text
-        
         if is_vol_safe:
             score += 3
-            bullish_factors.append(f"🟢 **Buy on Dip:** ราคาย่อลง Demand Zone ({active_zone['bottom']:.2f}) + Volume แห้ง/ปกติ")
-            if not is_squeeze: situation_insight = "💎 **Sniper Mode:** ราคาเข้าโซนซื้อด้วย Volume ที่ปลอดภัย รอจังหวะงัด"
-            if is_reversal_candle:
-                score += 1
-                bullish_factors.append("🕯️ เจอแท่งเทียนกลับตัว (Hammer/Doji) ในโซน")
+            bullish_factors.append(f"🟢 ราคาอยู่ใน Demand Zone + Volume ปลอดภัย")
+            if not is_squeeze: situation_insight = "💎 **Sniper Mode:** เข้าโซนซื้อสวย Volume แห้ง รอเด้ง"
+            if is_reversal_candle: score += 1; bullish_factors.append("🕯️ เจอแท่งเทียนกลับตัวในโซน")
         
-        if is_confluence:
-            score += 2
-            bullish_factors.append(f"⭐ **Golden Floor:** Demand Zone ตรงกับ {confluence_msg}")
-        
-        # Panic Selling Check
-        if "ระเบิด" in vol_grade_text and close < open_price: 
-            score -= 4
-            bearish_factors.append("⚠️ **Panic Selling:** ราคาทิ้งดิ่งเข้าโซนด้วย Volume มหาศาล (ระวังรับไม่อยู่)")
-            situation_insight = "💣 **Danger:** แรงขายรุนแรงมาก ระวังโซนแตก!"
+        if is_confluence: score += 2; bullish_factors.append(f"⭐ จุดนัดพบ: Demand Zone ตรงกับ {confluence_msg}")
 
-    else:
-        if price > ema20 and price > ema50: score += 1
-        elif price < ema20: score -= 1
-        
-        if is_big_candle and "Bullish" in candle_pattern:
-             score += 1; bullish_factors.append("Big Green Candle (แรงซื้อคุม)")
-        
-    if rsi < 30 and in_demand_zone:
-        score += 2; bullish_factors.append("RSI Oversold ใน Demand Zone (ของถูก)")
-    elif rsi > 70:
-        score -= 1; bearish_factors.append("RSI Overbought (ระวังแรงขาย)")
+    # --- 6. SAFETY NET & FINAL INSIGHT GENERATOR ---
     
-    if mtf_trend == "Bullish": score += 1
-    
-    status_color = "yellow"; banner_title = "Wait & See"; strategy_text = "รอจังหวะ"; holder_advice = "ถือเงินสดรอ"
-    
-    if in_demand_zone:
-        sl_val = active_zone['bottom'] - (atr_val * 0.5) 
-    else:
-        sl_val = price - (2 * atr_val) if not np.isnan(atr_val) else price * 0.95
+    # Safety Net 1: Crash (ระเบิดลง)
+    if "ระเบิด" in vol_grade_text and close < open_price:
+        score -= 10
+        bearish_factors.append("💀 **Panic Sell:** แรงขายระดับระเบิด (หนีตาย!)")
+        situation_insight = "🩸 **Market Crash:** แรงขายถล่มทลาย ห้ามรับมีดเด็ดขาด!"
+        # Reset Bullish Factors to avoid confusion
+        bullish_factors = [f for f in bullish_factors if "EMA" not in f and "Trend" not in f]
         
-    tp_val = price + (3 * atr_val) if not np.isnan(atr_val) else price * 1.05
+    # Safety Net 2: Heavy Selling (กฎรอง - ที่ SOFI โดน)
+    elif "คึกคัก" in vol_grade_text and is_big_candle and close < open_price:
+        score -= 3
+        bearish_factors.append("⚠️ **Heavy Selling:** แรงขายเยอะผิดปกติ + แท่งแดงยาว")
+        # Insight เฉพาะสำหรับเคสนี้
+        if score <= -3:
+            situation_insight = "🩸 **Falling Knife:** แรงขายกดดันต่อเนื่อง เสียทรงขาลงชัดเจน"
+        else:
+            situation_insight = "⚠️ **Selling Pressure:** ระวังแรงขายกดดัน อาจย่อตัวลึก"
 
+    # Default Insight Generator (ถ้าไม่เข้าเงื่อนไขพิเศษด้านบน ให้สร้างคำพูดตาม Score)
+    if situation_insight == "":
+        if score >= 5: situation_insight = "🚀 **Skyrocket:** โครงสร้างขาขึ้นแข็งแกร่ง + ปัจจัยบวกครบ"
+        elif score >= 3: situation_insight = "🐂 **Uptrend/Recovery:** เทรนด์ดี/เริ่มฟื้นตัว ย่อตัวน่าสนใจ"
+        elif score >= 1: situation_insight = "⚖️ **Sideway Up:** แกว่งตัวออกข้างอิงทางบวก รอจังหวะ"
+        elif score >= -2: situation_insight = "🐻 **Sideway Down:** แกว่งตัวออกข้างอิงทางลบ/ติดแนวต้าน"
+        else: situation_insight = "📉 **Downtrend:** โครงสร้างขาลง แรงขายยังคุมตลาด"
+
+    # Final Status Color & Text
     if score >= 5:
         status_color = "green"; banner_title = "🚀 Sniper Entry: จุดซื้อคมกริบ"; strategy_text = "Aggressive Buy"
-        holder_advice = f"โอกาสทอง! ราคาลงมาที่แนวรับสำคัญ + ปัจจัยบวกครบ SL: {sl_val:.2f}"
+        holder_advice = f"ทรงกราฟสวยมาก ถือรันเทรนด์หรือหาจังหวะเข้าเพิ่ม SL: {low-(atr_val*0.5):.2f}"
     elif score >= 3:
         status_color = "green"; banner_title = "🐂 Buy on Dip: ย่อซื้อ"; strategy_text = "Accumulate"
-        holder_advice = "ราคาย่อตัวน่าสนใจ ทยอยสะสมได้ แบ่งไม้เข้า"
+        holder_advice = "ย่อตัวในขาขึ้น/จุดรับ ทยอยสะสมได้"
     elif score >= 1:
         status_color = "yellow"; banner_title = "⚖️ Neutral: ไซด์เวย์"; strategy_text = "Wait for Trigger"
-        holder_advice = "เฝ้าดูโซนรับ ถ้าราคาเริ่มเด้งค่อยตาม"
+        holder_advice = "ตลาดเลือกทาง เฝ้าดูโซนรับ ถ้าราคาเริ่มเด้งค่อยตาม"
     elif score <= -3:
         status_color = "red"; banner_title = "🩸 Falling Knife: มีดหล่น"; strategy_text = "Wait / Cut Loss"
-        holder_advice = "อย่าเพิ่งรับมีด! แรงขายยังดุเดือด รอให้ Volume แห้งก่อน"
+        holder_advice = "อันตราย! แรงขายรุนแรง ห้ามรับจนกว่าจะเห็นฐานใหม่"
     else:
         status_color = "orange"; banner_title = "🐻 Bearish Pressure: แรงกดดันสูง"; strategy_text = "Avoid"
-        holder_advice = "เทรนด์ยังดูอ่อนแอ ไม่คุ้มเสี่ยง"
+        holder_advice = "เทรนด์อ่อนแอ/ติดต้าน อย่าเพิ่งเข้าเสี่ยง"
+
+    # SL/TP Logic
+    if in_demand_zone: sl_val = active_zone['bottom'] - (atr_val * 0.5) 
+    else: sl_val = price - (2 * atr_val) if not np.isnan(atr_val) else price * 0.95
+    tp_val = price + (3 * atr_val) if not np.isnan(atr_val) else price * 1.05
 
     return {
         "status_color": status_color, "banner_title": banner_title, "strategy": strategy_text, "context": situation_insight,
         "bullish_factors": bullish_factors, "bearish_factors": bearish_factors, "sl": sl_val, "tp": tp_val, "holder_advice": holder_advice,
         "candle_pattern": candle_pattern, "candle_color": candle_color, "candle_detail": candle_detail,
-        "vol_quality_msg": vol_grade_text, # Show Grade + %
-        "vol_quality_color": vol_grade_color,
+        "vol_quality_msg": vol_grade_text, "vol_quality_color": vol_grade_color,
         "in_demand_zone": in_demand_zone, "confluence_msg": confluence_msg,
         "is_squeeze": is_squeeze, "obv_insight": obv_insight
     }
@@ -842,7 +859,24 @@ if submit_btn:
                 if ai_report['bearish_factors']: 
                     st.markdown("**🔴 ปัจจัยลบ/ความเสี่ยง:**")
                     for w in ai_report['bearish_factors']: st.write(f"- {w}")
-                st.markdown("---"); st.info(f"🎒 **คำแนะนำ:** {ai_report['holder_advice']}"); st.write(f"🛑 **SL:** {ai_report['sl']:.2f} | ✅ **TP:** {ai_report['tp']:.2f}")
+                
+                # --- 🌟 NEW: Action Plan UI (บทสรุปที่ชัดเจนที่สุด) ---
+                st.markdown("---")
+                
+                # เลือกสีกล่องข้อความตามสถานะ
+                if "green" in ai_report['status_color']: box_type = st.success
+                elif "red" in ai_report['status_color']: box_type = st.error
+                else: box_type = st.warning
+                
+                box_type(f"""
+                ### 📝 บทสรุปและคำแนะนำ (Action Plan)
+                
+                **1. สถานการณ์ (Context):** {ai_report['context']}
+                
+                **2. คำแนะนำ (Action):** 👉 **{ai_report['strategy']}** : {ai_report['holder_advice']}
+                
+                **3. แผนการเทรด (Setup):** 🛑 **Stop Loss (หนี):** {ai_report['sl']:.2f}  |  ✅ **Take Profit (เป้า):** {ai_report['tp']:.2f}
+                """)
 
         st.write(""); st.markdown("""<div class='disclaimer-box'>⚠️ <b>หมายเหตุ:</b> ข้อมูลนี้มาจากการวิเคราะห์ทางเทคนิคด้วยระบบ AI เพื่อประกอบการตัดสินใจเท่านั้น</div>""", unsafe_allow_html=True); st.divider()
         st.subheader("📜 History Log")
