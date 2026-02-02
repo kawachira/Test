@@ -322,7 +322,7 @@ def ai_hybrid_analysis(price, ema20, ema50, ema200, rsi, macd_val, macd_sig, adx
     active_zone = None
     if demand_zones:
         for zone in demand_zones:
-            if (low <= zone['top'] * 1.005) and (high >= zone['bottom']):
+            if (low <= zone['top'] * 1.015) and (high >= zone['bottom']):
                 in_demand_zone = True; active_zone = zone; break
     
     # 3. Confluence Check
