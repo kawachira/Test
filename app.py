@@ -335,7 +335,7 @@ def ai_hybrid_analysis(price, ema20, ema50, ema200, rsi, macd_val, macd_sig, adx
     active_zone = None
     if demand_zones:
         for zone in demand_zones:
-            if (low <= zone['top'] * 1.015) and (high >= zone['bottom']):
+            if (low <= zone['top'] * 1.010) and (high >= zone['bottom']):
                 in_demand_zone = True; active_zone = zone; break
     
     is_confluence = False; confluence_msg = ""
@@ -813,5 +813,6 @@ if st.session_state['search_triggered']:
             st.dataframe(pd.DataFrame(st.session_state['history_log']), use_container_width=True, hide_index=True)
 
     else: st.error("ไม่พบข้อมูลหุ้น หรือข้อมูลไม่เพียงพอสำหรับคำนวณ")
+
 
 
