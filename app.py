@@ -457,17 +457,11 @@ def ai_hybrid_analysis(price, ema20, ema50, ema200, rsi, macd_val, macd_sig, adx
         if is_reversal: score += 1; bullish.append("🕯️ แท่งเทียนกลับตัวในโซน")
         if is_confluence: score += 2; bullish.append(f"⭐ {confluence_msg}")
         if not ctx: ctx = "💎 Sniper Mode (เข้าโซนสวย)"
-    # --- แทรกตรงนี้ (เพื่อกัน Insight ว่าง) ---
+     # --- แทรกตรงนี้ (เพื่อกัน Insight ว่าง) ---
     if ctx == "":
         if score >= 3: ctx = "📈 Uptrend Structure: โครงสร้างขาขึ้นยังดูดี"
         elif score <= -3: ctx = "📉 Downtrend Structure: โครงสร้างขาลงกดดัน"
         else: ctx = "⚖️ Choppy/Mixed: ปัจจัยบวก/ลบ คละเคล้ากัน"
-    # ------------------------------------
-
-    # --- FINAL STATUS ASSIGNMENT (10 STATUSES) ---
-    if score >= 6:
-        # ... (โค้ดเดิม)
-
 
     # --- FINAL STATUS ASSIGNMENT (10 STATUSES) ---
     if score >= 6:
