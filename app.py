@@ -630,7 +630,7 @@ if st.session_state['search_triggered']:
         ai_report = ai_hybrid_analysis(price, ema20, ema50, ema200, rsi, macd_val, macd_signal, adx_val, bb_upper, bb_lower, 
                                        vol_status, mtf_trend, atr, mtf_ema200_val,
                                        open_p, high_p, low_p, close_p, obv_val, obv_avg,
-                                       obv_slope_val, rolling_min_val, rolling_max_val,
+                                       obv_slope_val, 
                                        prev_open, prev_close, vol_now, vol_avg, demand_zones, is_squeeze)
 
         # Log Management
