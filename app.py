@@ -344,22 +344,26 @@ def ai_hybrid_analysis(price, ema20, ema50, ema200, rsi, macd_val, macd_sig, adx
             if rsi > 65: score -= 2; bearish.append(f"RSI {rsi:.0f} (Overbought แนวต้าน)")
             elif rsi < 30: score += 2; bullish.append(f"RSI {rsi:.0f} (Oversold รอเด้ง)")
 
-    # D. Smart OBV (Relative % & 4 Levels & Progressive Veto)
+       # D. Smart OBV (Upgraded 4 Levels & Progressive Veto)
     # สูตรใหม่: (Slope / Vol_Avg) * 100
     obv_strength_pct = 0
     if vol_avg > 0 and not np.isnan(obv_slope):
         obv_strength_pct = (obv_slope / vol_avg) * 100
     
     has_bearish_div = False
+    # แก้บรรทัดนี้: ให้แสดงค่า % เป็นค่าเริ่มต้นเสมอ
     obv_insight = f"Volume Flow ปกติ ({obv_strength_pct:.1f}%)"
     
     # 1. Bullish Flow (เงินเข้า)
     if obv_strength_pct > 5:
         # แบ่ง 4 ระดับ (ทวีคูณ)
-        if obv_strength_pct > 150: obv_lvl = "🔥 พีคจัด/ผิดปกติ (Extreme Climax)"
+        if obv_strength_pct > 150: obv_lvl = "🔥 พีคจัด (Climax)"
         elif obv_strength_pct > 60: obv_lvl = "🚀 กวาดซื้อ (Aggressive)"
-        elif obv_strength_pct > 20: obv_lvl = "💎 เก็บต่อเนื่อง (Steady)"
+        elif obv_strength_pct > 20: obv_lvl = "💎 เก็บของ (Steady)"
         else: obv_lvl = "🐣 แอบเก็บ (Creeping)"
+        
+        # อัปเดต Insight ทันที (แก้ตรงนี้)
+        obv_insight = f"{obv_lvl} (+{obv_strength_pct:.1f}%)"
         
         # Bullish Divergence Logic
         if price < ema20:
@@ -369,7 +373,7 @@ def ai_hybrid_analysis(price, ema20, ema50, ema200, rsi, macd_val, macd_sig, adx
                 score += 1 # Bonus
             else:
                 bullish.append(f"Smart OBV: Bullish Div - {obv_lvl} (+{obv_strength_pct:.1f}%)")
-            obv_insight = f"Bullish Div ({obv_lvl})"
+            obv_insight = f"Bullish Div ({obv_lvl})" # ถ้าเป็น Div ค่อยเขียนทับ
             
         # Flow ตามเทรนด์
         elif price > ema20:
@@ -378,32 +382,35 @@ def ai_hybrid_analysis(price, ema20, ema50, ema200, rsi, macd_val, macd_sig, adx
                 bullish.append(f"Fund Flow: เงินไหลเข้าต่อเนื่อง (+{obv_strength_pct:.1f}%)")
             elif obv_strength_pct > 150:
                 bullish.append(f"⚠️ Fund Flow: เงินเข้าแรงผิดปกติ ระวัง Climax (+{obv_strength_pct:.1f}%)")
-                obv_insight = "⚠️ Buying Climax Warning"
+                obv_insight = f"⚠️ Buying Climax (+{obv_strength_pct:.1f}%)"
 
     # 2. Bearish Flow (เงินออก - พร้อม Progressive Penalty)
     elif obv_strength_pct < -5:
         # แบ่ง 4 ระดับ
-        if obv_strength_pct < -150: obv_lvl = "🩸 เทกระจาด/Panic (Extreme Dump)"
-        elif obv_strength_pct < -60: obv_lvl = "🌊 ทิ้งของหนัก (Dumping)"
+        if obv_strength_pct < -150: obv_lvl = "🩸 เทกระจาด (Panic)"
+        elif obv_strength_pct < -60: obv_lvl = "🌊 ทิ้งของ (Dumping)"
         elif obv_strength_pct < -20: obv_lvl = "⚠️ ปล่อยของ (Distributing)"
         else: obv_lvl = "💧 รินขาย (Leaking)"
+        
+        # อัปเดต Insight ทันที (แก้ตรงนี้)
+        obv_insight = f"{obv_lvl} ({obv_strength_pct:.1f}%)"
         
         # Bearish Divergence (ราคาขึ้น/นิ่ง แต่เงินออก)
         if price > ema20:
             has_bearish_div = True
             
             # --- PROGRESSIVE PENALTY VETO ---
-            if obv_strength_pct >= -20: # Level 1: รินขายเบาๆ
-                score -= 2 # แค่ตัดแต้ม (Warning)
+            if obv_strength_pct >= -20: # Level 1
+                score -= 2 
                 bearish.append(f"⚠️ Warning: แรงขายทำกำไรระยะสั้น ({obv_lvl})")
-            elif obv_strength_pct >= -60: # Level 2: ปล่อยของ
-                score = 0 # VETO (ห้ามเข้า)
+            elif obv_strength_pct >= -60: # Level 2
+                score = 0 
                 bearish.append(f"⛔ STOP: เจ้ามือรินขายสวนราคา ({obv_lvl})")
-            else: # Level 3-4: เทกระจาด
-                score = -5 # สั่งหนี (Danger)
+            else: # Level 3-4
+                score = -5 
                 bearish.append(f"🩸 DANGER: กับดัก Bull Trap รุนแรง ({obv_lvl})")
             
-            obv_insight = f"Bearish Div ({obv_lvl})"
+            obv_insight = f"Bearish Div ({obv_lvl})" # ถ้าเป็น Div ค่อยเขียนทับ
             
         # Flow ออกตามเทรนด์
         elif price < ema20:
