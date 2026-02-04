@@ -6,14 +6,14 @@ import numpy as np
 import time
 from datetime import datetime, timedelta
 
-# --- Import สำหรับ Google Sheets (ส่วนที่เพิ่มมา) ---
+# --- Import สำหรับ Google Sheets ---
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 
 # --- 1. ตั้งค่าหน้าเว็บ (The Master Version) ---
 st.set_page_config(page_title="AI Stock Master (SMC)", page_icon="💎", layout="wide")
 
-# --- Initialize Session State (ส่วนที่เพิ่มมาเพื่อกันจอหาย + ประวัติ) ---
+# --- Initialize Session State (กันจอหาย + ประวัติ) ---
 if 'history_log' not in st.session_state:
     st.session_state['history_log'] = []
 
@@ -93,7 +93,7 @@ with col_form:
 # --- 4. Helper Functions ---
 
 def analyze_candlestick(open_price, high, low, close):
-    """ฟังก์ชันอ่านแท่งเทียน (Tuned Sensitivity 0.6)"""
+    """ฟังก์ชันอ่านแท่งเทียน"""
     body = abs(close - open_price)
     wick_upper = high - max(close, open_price)
     wick_lower = min(close, open_price) - low
@@ -171,12 +171,11 @@ def get_adx_interpretation(adx, is_uptrend):
     if adx >= 20: return "Developing Trend (เริ่มก่อตัว)"
     return "Weak/Sideway (ตลาดไร้ทิศทาง)"
 
-# --- Google Sheets Function (ส่วนที่เพิ่มมา) ---
+# --- Google Sheets Function ---
 def save_to_gsheet(data_dict):
     """ฟังก์ชันบันทึกข้อมูลลง Google Sheet โดยใช้ Streamlit Secrets"""
     try:
         scope = ['https://spreadsheets.google.com/feeds', 'https://www.googleapis.com/auth/drive']
-        
         # ดึง Credentials จาก Secrets
         creds_dict = dict(st.secrets["gcp_service_account"])
         creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
@@ -335,7 +334,7 @@ def ai_hybrid_analysis(price, ema20, ema50, ema200, rsi, macd_val, macd_sig, adx
     active_zone = None
     if demand_zones:
         for zone in demand_zones:
-            if (low <= zone['top'] * 1.010) and (high >= zone['bottom']):
+            if (low <= zone['top'] * 1.015) and (high >= zone['bottom']):
                 in_demand_zone = True; active_zone = zone; break
     
     is_confluence = False; confluence_msg = ""
@@ -648,7 +647,9 @@ if st.session_state['search_triggered']:
 
             st.subheader("🚧 Key Levels")
             
-            # === SUPPORTS ===
+            # ==============================================================================
+            # 🟢 RECOVERED LOGIC: SMART SUPPORTS (Confluence + VIP Filter from Code 2)
+            # ==============================================================================
             candidates_supp = []
             if not np.isnan(ema20) and ema20 < price: candidates_supp.append({'val': ema20, 'label': f"EMA 20 ({tf_label} - ระยะสั้น)"})
             if not np.isnan(ema50) and ema50 < price: candidates_supp.append({'val': ema50, 'label': f"EMA 50 ({tf_label})"})
@@ -679,12 +680,31 @@ if st.session_state['search_triggered']:
 
             candidates_supp.sort(key=lambda x: x['val'], reverse=True)
             
-            # Filter Overlap Support
+            # --- MERGE LOGIC (From Code 2) ---
+            merged_supp = []
+            skip_next = False
+            for i in range(len(candidates_supp)):
+                if skip_next: skip_next = False; continue
+                current = candidates_supp[i]
+                if i < len(candidates_supp) - 1:
+                    next_item = candidates_supp[i+1]
+                    if (current['val'] - next_item['val']) / current['val'] < 0.01: 
+                        new_label = f"⭐ Confluence Zone ({current['label']} + {next_item['label']})"
+                        merged_supp.append({'val': current['val'], 'label': new_label})
+                        skip_next = True
+                        continue
+                merged_supp.append(current)
+
+            # --- VIP FILTER LOGIC (From Code 2) ---
             final_show_supp = []
-            for item in candidates_supp:
+            for item in merged_supp:
+                if (price - item['val']) / price > 0.30 and "EMA 200 (TF Week" not in item['label']: continue
+                is_vip = "EMA 200" in item['label'] or "EMA 50 (TF Week" in item['label'] or "52-Week" in item['label'] or "Confluence" in item['label']
                 if not final_show_supp: final_show_supp.append(item)
                 else:
-                    if abs(final_show_supp[-1]['val'] - item['val']) >= min_dist:
+                    last_item = final_show_supp[-1]
+                    dist = abs(last_item['val'] - item['val'])
+                    if is_vip or dist >= min_dist:
                          final_show_supp.append(item)
 
             st.markdown("#### 🟢 แนวรับ"); 
@@ -692,7 +712,9 @@ if st.session_state['search_triggered']:
                 for item in final_show_supp[:4]: st.write(f"- **{item['val']:.2f} :** {item['label']}")
             else: st.error("🚨 ราคาหลุดทุกแนวรับสำคัญ! (All Time Low?)")
 
-            # === RESISTANCES ===
+            # ==============================================================================
+            # 🔴 RECOVERED LOGIC: SMART RESISTANCES (Confluence + VIP Filter from Code 2)
+            # ==============================================================================
             candidates_res = []
             if not np.isnan(ema20) and ema20 > price: candidates_res.append({'val': ema20, 'label': f"EMA 20 ({tf_label} - ต้านสั้น)"})
             if not np.isnan(ema50) and ema50 > price: candidates_res.append({'val': ema50, 'label': f"EMA 50 ({tf_label})"})
@@ -720,13 +742,32 @@ if st.session_state['search_triggered']:
 
             candidates_res.sort(key=lambda x: x['val'])
 
-            # Filter Overlap Resistance
+            # --- MERGE LOGIC (From Code 2) ---
+            merged_res = []
+            skip_next = False
+            for i in range(len(candidates_res)):
+                if skip_next: skip_next = False; continue
+                current = candidates_res[i]
+                if i < len(candidates_res) - 1:
+                    next_item = candidates_res[i+1]
+                    if (next_item['val'] - current['val']) / current['val'] < 0.01:
+                        new_label = f"⭐ Confluence Zone ({current['label']} + {next_item['label']})"
+                        merged_res.append({'val': current['val'], 'label': new_label})
+                        skip_next = True
+                        continue
+                merged_res.append(current)
+
+            # --- VIP FILTER LOGIC (From Code 2) ---
             final_show_res = []
-            for item in candidates_res:
+            for item in merged_res:
+                if (item['val'] - price) / price > 0.30 and "EMA 200 (TF Week" not in item['label']: continue
+                is_vip = "EMA 200" in item['label'] or "EMA 50 (TF Week" in item['label'] or "Confluence" in item['label']
                 if not final_show_res: final_show_res.append(item)
                 else:
-                    if abs(final_show_res[-1]['val'] - item['val']) >= min_dist:
-                         final_show_res.append(item)
+                    last_item = final_show_res[-1]
+                    dist = abs(item['val'] - last_item['val'])
+                    if is_vip or dist >= min_dist:
+                        final_show_res.append(item)
 
             st.markdown("#### 🔴 แนวต้าน"); 
             if final_show_res: 
@@ -758,9 +799,24 @@ if st.session_state['search_triggered']:
             """, unsafe_allow_html=True)
             
             st.subheader("🤖 AI STRATEGY (Hybrid)")
-            color_map = {"green": {"bg": "#dcfce7", "border": "#22c55e", "text": "#14532d"}, "red": {"bg": "#fee2e2", "border": "#ef4444", "text": "#7f1d1d"}, "orange": {"bg": "#ffedd5", "border": "#f97316", "text": "#7c2d12"}, "yellow": {"bg": "#fef9c3", "border": "#eab308", "text": "#713f12"}}
+            color_map = {
+                "green": {"bg": "#dcfce7", "border": "#22c55e", "text": "#14532d"}, 
+                "red": {"bg": "#fee2e2", "border": "#ef4444", "text": "#7f1d1d"}, 
+                "orange": {"bg": "#ffedd5", "border": "#f97316", "text": "#7c2d12"}, 
+                "yellow": {"bg": "#fef9c3", "border": "#eab308", "text": "#713f12"}
+            }
             c_theme = color_map.get(ai_report['status_color'], color_map["yellow"])
-            st.markdown(f"""<div style="background-color: {c_theme['bg']}; border-left: 6px solid {c_theme['border']}; padding: 20px; border-radius: 10px; margin-bottom: 20px;"><h2 style="color: {c_theme['text']}; margin:0 0 10px 0; font-size: 28px;">{ai_report['banner_title']}</h2><h3 style="color: {c_theme['text']}; margin:0 0 15px 0; font-size: 20px; opacity: 0.9;">{ai_report['strategy']}</h3><p style="color: {c_theme['text']}; font-size: 16px; margin:0; line-height: 1.6;"><b>💡 Insight:</b> {ai_report['context']}</p></div>""", unsafe_allow_html=True)
+            
+            # 2. แสดง Banner หัวข้อกลยุทธ์
+            st.markdown(f"""
+            <div style="background-color: {c_theme['bg']}; border-left: 6px solid {c_theme['border']}; padding: 20px; border-radius: 10px; margin-bottom: 20px;">
+                <h2 style="color: {c_theme['text']}; margin:0 0 10px 0; font-size: 28px;">{ai_report['banner_title']}</h2>
+                <h3 style="color: {c_theme['text']}; margin:0 0 15px 0; font-size: 20px; opacity: 0.9;">{ai_report['strategy']}</h3>
+                <p style="color: {c_theme['text']}; font-size: 16px; margin:0; line-height: 1.6;"><b>💡 Insight:</b> {ai_report['context']}</p>
+            </div>
+            """, unsafe_allow_html=True)
+            
+            # 3. แสดงรายละเอียด (Chat Interface Style)
             with st.chat_message("assistant"):
                 if ai_report['bullish_factors']: 
                     st.markdown("**🟢 ปัจจัยบวก:**")
@@ -770,6 +826,8 @@ if st.session_state['search_triggered']:
                     for w in ai_report['bearish_factors']: st.write(f"- {w}")
                 
                 st.markdown("---")
+                
+                # เลือกประเภทกล่องข้อความสรุป
                 if "green" in ai_report['status_color']: box_type = st.success
                 elif "red" in ai_report['status_color']: box_type = st.error
                 else: box_type = st.warning
@@ -786,33 +844,35 @@ if st.session_state['search_triggered']:
 
         st.write(""); st.markdown("""<div class='disclaimer-box'>⚠️ <b>หมายเหตุ:</b> ข้อมูลนี้มาจากการวิเคราะห์ทางเทคนิคด้วยระบบ AI เพื่อประกอบการตัดสินใจเท่านั้น</div>""", unsafe_allow_html=True)
         
-        # --- ส่วนแสดงปุ่มบันทึก (วางไว้ล่างสุดของการวิเคราะห์) ---
+        # --- ส่วนแสดงปุ่มบันทึก Google Sheets (ฟีเจอร์ใหม่จากโค้ด 1) ---
         st.markdown("---")
         col_btn, col_info = st.columns([2, 4])
         
         with col_btn:
-            # ดึงข้อมูลล่าสุด (Index 0 เพราะเราเพิ่ง insert ไป)
-            latest_data = st.session_state['history_log'][0]
-            
-            # ใช้ Key ของปุ่มให้ Unique ตามชื่อหุ้นและเวลา
-            save_key = f"save_{latest_data['หุ้น']}_{latest_data['เวลา']}"
-            
-            if st.button(f"💾 บันทึก {latest_data['หุ้น']} ลง Sheet", type="primary", use_container_width=True, key=save_key):
-                with st.spinner("กำลังส่งข้อมูลไป Google Sheet..."):
-                    success = save_to_gsheet(latest_data)
-                    
-                if success:
-                    st.toast(f"✅ บันทึก {latest_data['หุ้น']} เรียบร้อย!", icon="☁️")
-                    st.success(f"บันทึกข้อมูล {latest_data['หุ้น']} สำเร็จแล้ว")
-                else:
-                    st.error("บันทึกไม่สำเร็จ โปรดตรวจสอบชื่อ Sheet หรือการแชร์สิทธิ์")
+            # ตรวจสอบว่ามีข้อมูลใน History Log หรือไม่
+            if st.session_state['history_log']:
+                # ดึงข้อมูลล่าสุด (Index 0 เพราะเราเพิ่ง insert ไป)
+                latest_data = st.session_state['history_log'][0]
+                
+                # ใช้ Key ของปุ่มให้ Unique ตามชื่อหุ้นและเวลา (ป้องกันปุ่มรวน)
+                save_key = f"save_{latest_data['หุ้น']}_{latest_data['เวลา']}"
+                
+                if st.button(f"💾 บันทึก {latest_data['หุ้น']} ลง Sheet", type="primary", use_container_width=True, key=save_key):
+                    with st.spinner("กำลังส่งข้อมูลไป Google Sheet..."):
+                        success = save_to_gsheet(latest_data)
+                        
+                    if success:
+                        st.toast(f"✅ บันทึก {latest_data['หุ้น']} เรียบร้อย!", icon="☁️")
+                        st.success(f"บันทึกข้อมูล {latest_data['หุ้น']} สำเร็จแล้ว")
+                    else:
+                        st.error("บันทึกไม่สำเร็จ โปรดตรวจสอบชื่อ Sheet หรือการแชร์สิทธิ์")
         
+        # --- ส่วนแสดงประวัติการค้นหา (ฟีเจอร์ใหม่จากโค้ด 1) ---
         st.divider()
         st.subheader("📜 History Log (การค้นหาล่าสุด)")
         if st.session_state['history_log']: 
             st.dataframe(pd.DataFrame(st.session_state['history_log']), use_container_width=True, hide_index=True)
 
-    else: st.error("ไม่พบข้อมูลหุ้น หรือข้อมูลไม่เพียงพอสำหรับคำนวณ")
-
-
+    else: 
+        st.error("ไม่พบข้อมูลหุ้น หรือข้อมูลไม่เพียงพอสำหรับคำนวณ")
 
