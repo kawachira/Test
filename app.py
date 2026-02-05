@@ -11,7 +11,7 @@ import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 
 # --- 1. ตั้งค่าหน้าเว็บ (The Master Version) ---
-st.set_page_config(page_title="AI Stock Master (Hybrid Pro)", page_icon="💎", layout="wide")
+st.set_page_config(page_title="AI Stock Master (God Mode)", page_icon="💎", layout="wide")
 
 # --- Initialize Session State (กันจอหาย + ประวัติ) ---
 if 'history_log' not in st.session_state:
@@ -71,7 +71,7 @@ st.markdown("""
     """, unsafe_allow_html=True)
 
 # --- 3. ส่วนหัวข้อ ---
-st.markdown("<h1>💎 Ai<br><span style='font-size: 1.5rem; opacity: 0.7;'>Ultimate Sniper (Hybrid Pro Logic)🚀</span></h1>", unsafe_allow_html=True)
+st.markdown("<h1>💎 Ai<br><span style='font-size: 1.5rem; opacity: 0.7;'>Ultimate Sniper (God Mode Contextual)🚀</span></h1>", unsafe_allow_html=True)
 
 # --- Form ค้นหา ---
 col_space1, col_form, col_space2 = st.columns([1, 2, 1])
@@ -92,35 +92,92 @@ with col_form:
 
 # --- 4. Helper Functions (Visuals & Data) ---
 
-def analyze_candlestick(open_price, high, low, close):
-    """ฟังก์ชันอ่านแท่งเทียน"""
-    body = abs(close - open_price)
-    wick_upper = high - max(close, open_price)
-    wick_lower = min(close, open_price) - low
-    total_range = high - low
-    
-    color = "🟢 เขียว (Buying)" if close >= open_price else "🔴 แดง (Selling)"
-    if total_range == 0: return "Doji (N/A)", color, "N/A", False
+def analyze_candlestick(df_window):
+    """
+    ฟังก์ชันอ่านแท่งเทียน Pro Max (4-Bar Logic)
+    รับค่า: DataFrame ย้อนหลัง 4 แท่ง (Index 0=ไกลสุด, 3=ล่าสุด)
+    """
+    # 1. กัน Error: ถ้าข้อมูลส่งมาไม่ครบ 4 แท่ง ให้ตอบค่ากลางๆ
+    if len(df_window) < 4: 
+        return "Normal Candle", "gray", "ข้อมูลไม่เพียงพอ", False
+
+    # 2. แยกชิ้นส่วน 4 วัน (เพื่อให้เขียน Logic ง่าย)
+    c1 = df_window.iloc[0] # 3 วันก่อน
+    c2 = df_window.iloc[1] # 2 วันก่อน
+    c3 = df_window.iloc[2] # เมื่อวาน (Prev)
+    c4 = df_window.iloc[3] # วันนี้ (Current)
+
+    # ดึงค่าตัวเลขวันนี้
+    open_p = c4['Open']; close_p = c4['Close']
+    high_p = c4['High']; low_p = c4['Low']
+    body = abs(close_p - open_p)
+    range_len = high_p - low_p
+    is_bull = close_p >= open_p
+    color = "🟢 เขียว (Buying)" if is_bull else "🔴 แดง (Selling)"
+
+    # ดึงค่าตัวเลขเมื่อวาน
+    prev_open = c3['Open']; prev_close = c3['Close']
+    is_prev_bull = prev_close >= prev_open
 
     pattern_name = "Normal Candle (ปกติ)"
     detail = "แรงซื้อขายสมดุล"
     is_big = False
 
-    if wick_lower > (body * 2) and wick_upper < body:
-        pattern_name = "Hammer/Pinbar (ค้อน)"
-        detail = "ปฏิเสธราคาต่ำ (แรงซื้อสวนกลับ)"
-    elif wick_upper > (body * 2) and wick_lower < body:
-        pattern_name = "Shooting Star (ดาวตก)"
-        detail = "ปฏิเสธราคาสูง (โดนตบหัวทิ่ม)"
-    elif body > (total_range * 0.6): 
+    # --- 🧠 LEVEL 1: รูปแบบกลุ่ม 3-4 แท่ง (แม่นยำสูง) ---
+
+    # 1. Three Black Crows (อีกา 3 ตัว - ขาลงรุนแรง)
+    if (c2['Close'] < c2['Open']) and (c3['Close'] < c3['Open']) and (c4['Close'] < c4['Open']):
+        if (c4['Close'] < c3['Close']) and (c3['Close'] < c2['Close']):
+            return "🦅 Three Black Crows (อีกา 3 ตัว)", "🔴 แดง (Selling)", "แรงขายทุบต่อเนื่อง 3 วัน (ระวังลงลึก)", True
+
+    # 2. Three White Soldiers (3 ทหารเสือ - ขาขึ้นรุนแรง)
+    if (c2['Close'] > c2['Open']) and (c3['Close'] > c3['Open']) and (c4['Close'] > c4['Open']):
+        if (c4['Close'] > c3['Close']) and (c3['Close'] > c2['Close']):
+            return "💂 Three White Soldiers (3 ทหารเสือ)", "🟢 เขียว (Buying)", "แรงซื้อดันต่อเนื่อง 3 วัน (แข็งแกร่ง)", True
+
+    # 3. Morning Star (กลับตัวขึ้น)
+    c2_body = abs(c2['Close'] - c2['Open']); c2_range = c2['High'] - c2['Low']
+    if (c2['Close'] < c2['Open']) and (c2_body > c2_range * 0.5): # แท่ง 1 แดงยาว
+        if abs(c3['Close'] - c3['Open']) < c2_body * 0.4: # แท่ง 2 ตัวเล็ก (Star)
+            midpoint = (c2['Open'] + c2['Close']) / 2
+            if (c4['Close'] > c4['Open']) and (c4['Close'] > midpoint): # แท่ง 3 เขียวสวนเกินครึ่ง
+                return "🌅 Morning Star (รุ่งอรุณ)", "🟢 เขียว (Buying)", "กลับตัวขึ้นสวยงาม (Confirm Reversal)", True
+
+    # 4. Evening Star (กลับตัวลง)
+    if (c2['Close'] > c2['Open']) and (c2_body > c2_range * 0.5): # แท่ง 1 เขียวยาว
+        if abs(c3['Close'] - c3['Open']) < c2_body * 0.4: # แท่ง 2 ตัวเล็ก
+            midpoint = (c2['Open'] + c2['Close']) / 2
+            if (c4['Close'] < c4['Open']) and (c4['Close'] < midpoint): # แท่ง 3 แดงสวนลงมา
+                return "🌆 Evening Star (พลบค่ำ)", "🔴 แดง (Selling)", "กลับตัวลงชัดเจน (Confirm Reversal)", True
+
+    # --- 🧠 LEVEL 2: รูปแบบ 2 แท่ง (Engulfing) ---
+    
+    # Bearish Engulfing
+    if is_prev_bull and not is_bull: # เมื่อวานเขียว วันนี้แดง
+        if (open_p >= prev_close) and (close_p <= prev_open):
+            return "🐻 Bearish Engulfing (กลืนกินขาลง)", "🔴 แดง (Selling)", "แท่งแดงกลบแท่งเขียวเมื่อวาน", True
+
+    # Bullish Engulfing
+    if not is_prev_bull and is_bull: # เมื่อวานแดง วันนี้เขียว
+        if (open_p <= prev_close) and (close_p >= prev_open):
+            return "🐂 Bullish Engulfing (กลืนกินขาขึ้น)", "🟢 เขียว (Buying)", "แท่งเขียวกลบแท่งแดงเมื่อวาน", True
+
+    # --- 🧠 LEVEL 3: รูปแบบแท่งเดียว (Basic) ---
+    
+    wick_up = high_p - max(close_p, open_p)
+    wick_low = min(close_p, open_p) - low_p
+    
+    if wick_low > (body * 2) and wick_up < body:
+        pattern_name = "🔨 Hammer/Pinbar (ค้อน)"
+        detail = "ปฏิเสธราคาต่ำ (แรงซื้อสวน)"
+    elif wick_up > (body * 2) and wick_low < body:
+        pattern_name = "☄️ Shooting Star (ดาวตก)"
+        detail = "ปฏิเสธราคาสูง (แรงขายตบ)"
+    elif body > (range_len * 0.6): 
         is_big = True
-        if close > open_price: 
-            pattern_name = "Big Bullish (แท่งเขียวตัน)"
-            detail = "แรงซื้อคุมตลาดเบ็ดเสร็จ"
-        else: 
-            pattern_name = "Big Bearish (แท่งแดงตัน)"
-            detail = "แรงขายคุมตลาดเบ็ดเสร็จ"
-    elif body < (total_range * 0.1):
+        pattern_name = "Big Bullish (แท่งเขียวตัน)" if is_bull else "Big Bearish (แท่งแดงตัน)"
+        detail = "แรงซื้อ/ขาย คุมตลาดเบ็ดเสร็จ"
+    elif body < (range_len * 0.1):
         pattern_name = "Doji (โดจิ)"
         detail = "ตลาดลังเล (Indecision)"
         
@@ -275,30 +332,33 @@ def analyze_volume(row, vol_ma):
     elif pct <= 70: return f"🌵 ต่ำ/เบาบาง ({pct:.0f}%)", "#f59e0b"
     else: return f"☁️ ปกติ ({pct:.0f}%)", "gray"
 
-# --- 7. AI Decision Engine (THE UPGRADED BRAIN - HYBRID PRO) ---
-# ระบบสมองใหม่: Weighted Score + Regime Filter + Progressive Veto + Context
+# --- 7. AI Decision Engine (THE UPGRADED BRAIN - GOD MODE) ---
+# ระบบสมองใหม่: Contextual Scoring + 4-Bar Pattern + Volume Filter + Trend Integration
 
 def ai_hybrid_analysis(price, ema20, ema50, ema200, rsi, macd_val, macd_sig, adx, bb_up, bb_low, 
                        vol_status, mtf_trend, atr_val, mtf_ema200_val,
                        open_price, high, low, close, obv_val, obv_avg,
                        obv_slope, prev_open, prev_close, vol_now, vol_avg, demand_zones,
-                       is_squeeze):
+                       is_squeeze, df_candles): # <--- รับ 4 แท่งตรงนี้
 
     def safe(x): return float(x) if not np.isnan(float(x)) else np.nan
     price = safe(price); ema20 = safe(ema20); ema50 = safe(ema50); ema200 = safe(ema200)
     atr_val = safe(atr_val); obv_slope = safe(obv_slope); vol_now = safe(vol_now); vol_avg = safe(vol_avg)
 
-    # 1. Pattern & Volume Insight (เพิ่ม Logic ตรวจจับ Volume แห้ง/ระเบิด)
-    candle_pattern, candle_color, candle_detail, is_big_candle = analyze_candlestick(open_price, high, low, close)
-    is_reversal = "Hammer" in candle_pattern or "Doji" in candle_pattern
-    is_shooting_star = "Shooting Star" in candle_pattern
+    # 1. 🔬 Deep Vision: อ่านแท่งเทียน 4 แท่งแบบละเอียด
+    candle_pattern, candle_color, candle_detail, is_big_candle = analyze_candlestick(df_candles)
     
+    is_reversal_up = any(x in candle_pattern for x in ["Hammer", "Bullish Engulfing", "Morning Star", "Three White Soldiers"])
+    is_reversal_down = any(x in candle_pattern for x in ["Shooting Star", "Bearish Engulfing", "Evening Star", "Three Black Crows"])
+    
+    is_shooting_star = "Shooting Star" in candle_pattern
+
     # Volume Logic (Smart Check)
     is_vol_dry = vol_now < (vol_avg * 0.8) # วอลุ่มแห้ง (พักตัวดี)
     is_vol_climax = vol_now > (vol_avg * 2.0) # วอลุ่มระเบิด (ระวังจบแรลลี่)
     vol_txt, vol_col = analyze_volume({'Volume': vol_now}, vol_avg)
 
-    # 2. Zone Checking (Buffer 1.5%)
+    # 2. 🏗️ Zone Checking (Buffer 1.5%)
     in_demand_zone = False; active_zone = None; confluence_msg = ""
     if demand_zones:
         for zone in demand_zones:
@@ -310,201 +370,171 @@ def ai_hybrid_analysis(price, ema20, ema50, ema200, rsi, macd_val, macd_sig, adx
         if not np.isnan(ema200) and abs(active_zone['bottom'] - ema200) / price < 0.02: is_confluence = True; confluence_msg = "Zone + EMA 200"
         elif not np.isnan(ema50) and abs(active_zone['bottom'] - ema50) / price < 0.02: is_confluence = True; confluence_msg = "Zone + EMA 50"
 
-    # 3. Regime Filter (ADX)
+    # 3. 🌊 Regime Filter (ADX & Trend)
     is_strong_trend = adx > 25 if not np.isnan(adx) else False
-    
-    # --- SCORING SYSTEM (Weighted) ---
+    is_major_uptrend = price > ema200 if not np.isnan(ema200) else True
+
+    # --- 🧠 CONTEXTUAL SCORING SYSTEM (God Mode) ---
     score = 0
     bullish = []
     bearish = []
+    ctx = ""
 
-    # A. Trend (EMA200 King) - ให้คะแนนหนักสุด (+3)
+    # A. 🏛️ Structural Score (โครงสร้างพื้นฐาน)
     if not np.isnan(ema200):
-        if price > ema200: score += 3; bullish.append("ยืนเหนือ EMA 200 (เทรนด์หลักขาขึ้น)")
-        else: score -= 3; bearish.append("หลุด EMA 200 (เทรนด์หลักขาลง)")
+        if price > ema200: score += 3; bullish.append("Structure: ยืนเหนือ EMA 200 (ขาขึ้นระยะยาว)")
+        else: score -= 3; bearish.append("Structure: หลุด EMA 200 (ขาลงระยะยาว)")
 
     if not np.isnan(ema50):
-        if price > ema50: score += 2; bullish.append("ยืนเหนือ EMA 50 (ระยะกลางแกร่ง)")
-        else: score -= 1; bearish.append("หลุด EMA 50 (ระยะกลางเสียทรง)")
+        if price > ema50: score += 2; bullish.append("Structure: ยืนเหนือ EMA 50 (แกร่งระยะกลาง)")
+        else: score -= 1; bearish.append("Structure: หลุด EMA 50 (เสียทรงระยะกลาง)")
 
-    # B. Momentum (MACD)
-    if not np.isnan(macd_val) and macd_val > macd_sig: score += 1; bullish.append("MACD ตัดขึ้น (Momentum บวก)")
-    elif not np.isnan(macd_val): score -= 1; bearish.append("MACD ตัดลง (Momentum ลบ)")
-    
-    # C. RSI Contextual Scoring (Regime Filter: Trend vs Sideway)
-    if not np.isnan(rsi):
-        if is_strong_trend and price > ema200: # Regime: Trending Up
-            if rsi > 75: 
-                if is_vol_climax: # Climax Top Logic
-                    score -= 2; bearish.append("⚠️ Climax Top? (RSI Peak + Vol Peak)")
-                else: 
-                    score += 1; bullish.append(f"RSI {rsi:.0f} (Super Momentum - Run Trend)")
-            elif rsi < 45: score += 2; bullish.append(f"RSI {rsi:.0f} (Dip ในขาขึ้น)")
-        else: # Regime: Sideway / Downtrend
-            if rsi > 65: score -= 2; bearish.append(f"RSI {rsi:.0f} (Overbought แนวต้าน)")
-            elif rsi < 30: score += 2; bullish.append(f"RSI {rsi:.0f} (Oversold รอเด้ง)")
+    # B. 🕯️ Price Action Score (ตัดสินใจด้วย 4 แท่ง + บริบท)
+    # --- กลุ่มสัญญาณลบ (Bearish) ---
+    if "Three Black Crows" in candle_pattern:
+        score -= 3 # โดนหนัก
+        bearish.append("🦅 Three Black Crows: แรงขายทุบ 3 วันติด (อันตราย)")
+        ctx = "🩸 Panic Dump: หนีตาย (เจ้ามือทิ้งของ)" # Veto
 
-       # D. Smart OBV (Upgraded 4 Levels & Progressive Veto)
-    # สูตรใหม่: (Slope / Vol_Avg) * 100
+    elif "Evening Star" in candle_pattern:
+        score -= 2
+        bearish.append("🌆 Evening Star: กลับตัวลงสมบูรณ์แบบ")
+        if score < 2: ctx = "📉 Reversal: สัญญาณกลับตัวลงชัดเจน"
+
+    elif "Bearish Engulfing" in candle_pattern:
+        # Contextual Check: วอลุ่มและการย่อตัว
+        if is_vol_climax: 
+            score -= 3 # วอลุ่มพีค = เจ้าทิ้ง
+            bearish.append("🐻 Bearish Engulfing + Vol Peak (เจ้ามือทิ้งของ)")
+            ctx = "🩸 Panic Sell: แรงขายมหาศาล"
+        elif is_major_uptrend and is_vol_dry:
+            score += 1 # พลิกวิกฤตเป็นโอกาส
+            bullish.append("🐂 Bullish Pullback: แท่งแดงวอลุ่มแห้ง (ย่อเพื่อไปต่อ)")
+        else:
+            score -= 2 # ปกติ
+            bearish.append("⚠️ Bearish Engulfing: แรงขายชนะแรงซื้อ")
+
+    elif is_shooting_star:
+        if price > bb_up: # ชน Bollinger Band บน
+            score -= 2
+            bearish.append("☄️ Shooting Star: โดนตบที่แนวต้าน BB (Overbought)")
+        else:
+            score -= 1
+            bearish.append("☄️ Shooting Star: มีแรงขายกดดันข้างบน")
+
+    # --- กลุ่มสัญญาณบวก (Bullish) ---
+    if "Three White Soldiers" in candle_pattern:
+        score += 3
+        bullish.append("💂 Three White Soldiers: แรงซื้อ 3 วันติด (แข็งแกร่งมาก)")
+
+    elif "Morning Star" in candle_pattern:
+        if in_demand_zone:
+            score += 3 # คูณพิเศษ
+            bullish.append("🌅 Morning Star (in Zone): จุดกลับตัวต้นน้ำสวยงาม")
+        else:
+            score += 2
+            bullish.append("🌅 Morning Star: กลับตัวขึ้นสมบูรณ์")
+
+    elif "Bullish Engulfing" in candle_pattern:
+        # Contextual Check: วอลุ่มและตำแหน่ง
+        if rsi > 70: # ซื้อยอดดอย
+            score -= 1
+            bearish.append("⚠️ Bullish Trap: เขียวที่ยอดดอย (RSI Overbought)")
+        elif is_vol_climax:
+            score += 3
+            bullish.append("🚀 Power Buy: แท่งเขียวกลืนกิน + วอลุ่มระเบิด")
+        else:
+            score += 2
+            bullish.append("🐂 Bullish Engulfing: แรงซื้อชนะแรงขาย")
+
+    # C. 📊 Volume & Flow Analysis (Smart OBV)
     obv_strength_pct = 0
     if vol_avg > 0 and not np.isnan(obv_slope):
         obv_strength_pct = (obv_slope / vol_avg) * 100
     
-    has_bearish_div = False
-    # แก้บรรทัดนี้: ให้แสดงค่า % เป็นค่าเริ่มต้นเสมอ
-    obv_insight = f"Volume Flow ปกติ ({obv_strength_pct:.1f}%)"
-    
-    # 1. Bullish Flow (เงินเข้า)
-    if obv_strength_pct > 5:
-        # แบ่ง 4 ระดับ (ทวีคูณ)
-        if obv_strength_pct > 150: obv_lvl = "🔥 พีคจัด (Climax)"
-        elif obv_strength_pct > 60: obv_lvl = "🚀 กวาดซื้อ (Aggressive)"
-        elif obv_strength_pct > 20: obv_lvl = "💎 เก็บของ (Steady)"
-        else: obv_lvl = "🐣 แอบเก็บ (Creeping)"
+    obv_insight = f"Flow ปกติ ({obv_strength_pct:.1f}%)"
+
+    if obv_strength_pct > 5: # เงินเข้า
+        if obv_strength_pct > 60: obv_insight = f"🚀 กวาดซื้อ ({obv_strength_pct:.1f}%)"
+        else: obv_insight = f"💎 เก็บของ ({obv_strength_pct:.1f}%)"
         
-        # อัปเดต Insight ทันที (แก้ตรงนี้)
-        obv_insight = f"{obv_lvl} (+{obv_strength_pct:.1f}%)"
-        
-        # Bullish Divergence Logic
-        if price < ema20:
+        # Bullish Divergence Check
+        if price < ema20: # ราคาลงแต่เงินเข้า
             score += 2
-            if obv_strength_pct > 150: 
-                bullish.append(f"💎💎 SUPER RARE: เก็บของระดับ Climax (+{obv_strength_pct:.1f}%)")
-                score += 1 # Bonus
-            else:
-                bullish.append(f"Smart OBV: Bullish Div - {obv_lvl} (+{obv_strength_pct:.1f}%)")
-            obv_insight = f"Bullish Div ({obv_lvl})" # ถ้าเป็น Div ค่อยเขียนทับ
-            
-        # Flow ตามเทรนด์
-        elif price > ema20:
-            if 20 < obv_strength_pct <= 150: # Healthy Flow
-                score += 1
-                bullish.append(f"Fund Flow: เงินไหลเข้าต่อเนื่อง (+{obv_strength_pct:.1f}%)")
-            elif obv_strength_pct > 150:
-                bullish.append(f"⚠️ Fund Flow: เงินเข้าแรงผิดปกติ ระวัง Climax (+{obv_strength_pct:.1f}%)")
-                obv_insight = f"⚠️ Buying Climax (+{obv_strength_pct:.1f}%)"
-
-    # 2. Bearish Flow (เงินออก - พร้อม Progressive Penalty)
-    elif obv_strength_pct < -5:
-        # แบ่ง 4 ระดับ
-        if obv_strength_pct < -150: obv_lvl = "🩸 เทกระจาด (Panic)"
-        elif obv_strength_pct < -60: obv_lvl = "🌊 ทิ้งของ (Dumping)"
-        elif obv_strength_pct < -20: obv_lvl = "⚠️ ปล่อยของ (Distributing)"
-        else: obv_lvl = "💧 รินขาย (Leaking)"
-        
-        # อัปเดต Insight ทันที (แก้ตรงนี้)
-        obv_insight = f"{obv_lvl} ({obv_strength_pct:.1f}%)"
-        
-        # Bearish Divergence (ราคาขึ้น/นิ่ง แต่เงินออก)
-        if price > ema20:
-            has_bearish_div = True
-            
-            # --- PROGRESSIVE PENALTY VETO ---
-            if obv_strength_pct >= -20: # Level 1
-                score -= 2 
-                bearish.append(f"⚠️ Warning: แรงขายทำกำไรระยะสั้น ({obv_lvl})")
-            elif obv_strength_pct >= -60: # Level 2
-                score = 0 
-                bearish.append(f"⛔ STOP: เจ้ามือรินขายสวนราคา ({obv_lvl})")
-            else: # Level 3-4
-                score = -5 
-                bearish.append(f"🩸 DANGER: กับดัก Bull Trap รุนแรง ({obv_lvl})")
-            
-            obv_insight = f"Bearish Div ({obv_lvl})" # ถ้าเป็น Div ค่อยเขียนทับ
-            
-        # Flow ออกตามเทรนด์
-        elif price < ema20:
-             if -150 <= obv_strength_pct < -20: score -= 1
-             bearish.append(f"Fund Flow: เงินไหลออกต่อเนื่อง ({obv_strength_pct:.1f}%)")
-
-    # E. Advanced Patterns & Context (Logic ใหม่)
-    ctx = ""
-    
-    # 1. Panic Sell (Veto ตายตัว)
-    if "ระเบิด" in vol_txt and close < open_price:
-        score = -10; ctx = "💀 Panic Sell: แรงขายถล่มทลาย (หนีตาย!)"
-
-    # 2. Rebound to Drop (เด้งเพื่อลง)
-    elif score < 0 and (high >= ema20 or high >= ema50) and (is_shooting_star or is_vol_dry):
-        score = -5
-        ctx = "📉 Rebound to Drop: เด้งชนต้านวอลุ่มแห้ง (ขายทิ้ง)"
-        bearish.append("เด้งไม่มี Volume (Fake Pump)")
-
-    # 3. Bullish Pullback (ย่อเพื่อขึ้น - Best Entry)
-    elif score >= 2 and (price > ema200) and (price < ema20) and is_vol_dry:
-        score += 3 # บวกคะแนนเพิ่ม
-        ctx = "🐂 Bullish Pullback: ย่อตัววอลุ่มแห้ง (จุดเข้าสวย)"
-        bullish.append("ย่อตัวด้วย Volume ต่ำ (พักตัวปลอดภัย)")
-
-    # 4. Smart Sideways (Logic 3 แบบ)
-    elif not is_strong_trend:
-        # 4.1 Sideway Up
-        if (price > ema50) and (obv_strength_pct > 0):
-            score += 1 
-            ctx = "⚖️ Sideway Up: สะสมพลัง (เงินเข้า+ยืนเหนือเส้น)"
-            bullish.append("Sideway Accumulation (น่าดักเก็บ)")
-            if is_squeeze: ctx += " + Squeeze (รอระเบิดขึ้น)"
-        
-        # 4.2 Sideway Down
-        elif (price < ema50) and (obv_strength_pct < 0):
-            score -= 2
-            ctx = "⚖️ Sideway Down: รินขาย (เงินออก+ติดแนวต้าน)"
-            bearish.append("Sideway Distribution (เสี่ยงหลุด Low)")
-            if is_squeeze: ctx += " + Squeeze (ระวังระเบิดลง)"
-            
-        # 4.3 Sideway Neutral (ไร้ทิศทาง)
+            bullish.append(f"Bullish Divergence: ราคาลงแต่เงินเข้า ({obv_strength_pct:.1f}%)")
+            obv_insight = "Bullish Div (เก็บของ)"
         else:
-            score = 0 # No Trade Zone
-            if obv_strength_pct > 0: ctx = "⚖️ Choppy: ราคาอ่อนแอแต่เงินเข้า (รอชัดเจน)"
-            else: ctx = "⚖️ Choppy: ราคายืนได้แต่เงินออก (ระวังหลอก)"
+            score += 1
+            bullish.append(f"Fund Flow: เงินไหลเข้าต่อเนื่อง")
 
-    # Zone Bonus
+    elif obv_strength_pct < -5: # เงินออก
+        if obv_strength_pct < -60: obv_insight = f"🩸 ทิ้งของ ({obv_strength_pct:.1f}%)"
+        else: obv_insight = f"💧 รินขาย ({obv_strength_pct:.1f}%)"
+
+        # Bearish Divergence Check
+        if price > ema20: # ราคาขึ้นแต่เงินออก
+            score -= 2
+            bearish.append(f"Bearish Divergence: ราคาขึ้นแต่เงินออก ({obv_strength_pct:.1f}%)")
+            obv_insight = "Bearish Div (รินขาย)"
+        else:
+            score -= 1
+            bearish.append(f"Fund Flow: เงินไหลออกต่อเนื่อง")
+
+    # D. ⚡ Momentum & Indicators (RSI/MACD)
+    if not np.isnan(macd_val) and macd_val > macd_sig: score += 1; bullish.append("MACD ตัดขึ้น")
+    elif not np.isnan(macd_val): score -= 1
+
+    # RSI Context
+    if not np.isnan(rsi):
+        if is_strong_trend and is_major_uptrend:
+            if rsi > 75 and not is_vol_climax: score += 1; bullish.append(f"RSI {rsi:.0f}: Super Bullish Trend") # Run trend
+            elif rsi < 45: score += 2; bullish.append(f"RSI {rsi:.0f}: Dip Opportunity (ย่อซื้อ)")
+        else: # Sideway
+            if rsi > 65: score -= 2; bearish.append(f"RSI {rsi:.0f}: Overbought (ระวังต้าน)")
+            elif rsi < 30: score += 2; bullish.append(f"RSI {rsi:.0f}: Oversold (รอเด้ง)")
+
+    # E. 🛡️ Special Context (Veto Rules)
     if in_demand_zone:
-        score += 3; bullish.append("🟢 In Demand Zone")
-        if is_reversal: score += 1; bullish.append("🕯️ แท่งเทียนกลับตัวในโซน")
-        if is_confluence: score += 2; bullish.append(f"⭐ {confluence_msg}")
+        score += 3; bullish.append("🟢 In Demand Zone (ต้นทุนดี)")
+        if is_confluence: score += 1; bullish.append(f"⭐ {confluence_msg}")
         if not ctx: ctx = "💎 Sniper Mode (เข้าโซนสวย)"
-     # --- แทรกตรงนี้ (เพื่อกัน Insight ว่าง) ---
-    if ctx == "":
-        if score >= 3: ctx = "📈 Uptrend Structure: โครงสร้างขาขึ้นยังดูดี"
-        elif score <= -3: ctx = "📉 Downtrend Structure: โครงสร้างขาลงกดดัน"
-        else: ctx = "⚖️ Choppy/Mixed: ปัจจัยบวก/ลบ คละเคล้ากัน"
 
-    # --- FINAL STATUS ASSIGNMENT (10 STATUSES) ---
+    # Final Context Generation
+    if ctx == "":
+        if score >= 5: ctx = "🚀 Bullish Breakout: โมเมนตัมกระทิงดุ"
+        elif score >= 2: ctx = "📈 Uptrend Structure: ย่อตัวเพื่อขึ้นต่อ"
+        elif score <= -4: ctx = "🩸 Bearish Crash: แรงขายรุนแรง (ห้ามรับ)"
+        elif score <= -1: ctx = "📉 Downtrend Pressure: เด้งเพื่อลง"
+        else: ctx = "⚖️ Sideway/Neutral: รอเลือกทาง"
+
+    # --- FINAL STATUS ASSIGNMENT ---
     if score >= 6:
         color = "green"; title = "🚀 Sniper Entry: จุดซื้อคมกริบ"; strat = "Aggressive Buy"
-        adv = f"โมเมนตัมแรงจัด วอลุ่มสนับสนุน ถือรันเทรนด์ SL: {low-(atr_val*1.0):.2f}"
+        adv = f"โมเมนตัมแรงจัด Pattern สวย ถือรันเทรนด์ SL: {low-(atr_val*1.0):.2f}"
     elif score >= 4:
-        if "Pullback" in ctx:
+        if "Pullback" in ctx or "Dip" in str(bullish):
             color = "green"; title = "🐂 Bullish Pullback: ย่อเพื่อไปต่อ"; strat = "Buy on Dip"
-            adv = "ราคาย่อตัวในขาขึ้น วอลุ่มแห้ง เป็นจังหวะเก็บของที่ดีที่สุด"
+            adv = "ราคาย่อตัวในขาขึ้น วอลุ่มแห้ง/RSI ต่ำ เป็นจังหวะเก็บของที่ดีที่สุด"
         else:
             color = "green"; title = "🐂 Strong Buy: ขาขึ้นแข็งแกร่ง"; strat = "Accumulate"
             adv = "เทรนด์หลักเป็นขาขึ้น ย่อตัวน่าสนใจ"
     elif score >= 1:
         if "Sideway Up" in ctx:
-            color = "yellow"; title = "⚖️ Sideway Up: สะสมพลัง"; strat = "Accumulate (ดักเก็บ)"
+            color = "yellow"; title = "⚖️ Sideway Up: สะสมพลัง"; strat = "Accumulate"
             adv = "ราคาออกข้างแต่เงินไหลเข้า ดักเก็บที่แนวรับ ลุ้นเบรค"
         else:
-            color = "yellow"; title = "⚖️ Neutral: ไซด์เวย์ไร้ทิศทาง"; strat = "No Trade Zone"
-            adv = "ข้อมูลขัดแย้งกัน ตลาดยังมึนงง นั่งทับมือรอความชัดเจน"
+            color = "yellow"; title = "⚖️ Neutral: รอความชัดเจน"; strat = "Wait & Watch"
+            adv = "ปัจจัยขัดแย้งกัน (เช่น เทรนด์ดีแต่เจอแท่งเทียนกลับตัว) นั่งทับมือไปก่อน"
     elif score <= -4:
         if "Panic" in ctx:
             color = "red"; title = "💀 Panic Sell: หนีตาย"; strat = "Exit Immediately"
-            adv = "วงแตก! แรงขายระดับวิกฤต ห้ามรับเด็ดขาด"
+            adv = "วงแตก! แรงขายระดับวิกฤต (3 Crows / Vol Peak) ห้ามรับเด็ดขาด"
         else:
-            color = "red"; title = "🩸 Falling Knife: มีดหล่น"; strat = "Wait / Cut Loss"
-            adv = "ราคาดิ่งแรง ลงรับมีดอาจมือขาด รอให้หยุดลงและสร้างฐานก่อน"
+            color = "red"; title = "🩸 Falling Knife: มีดหล่น"; strat = "Avoid / Cut Loss"
+            adv = "ราคาดิ่งแรง หลุดแนวรับสำคัญ รอให้หยุดลงและสร้างฐานก่อน"
     else: # Score 0 to -3
-        if "Rebound" in ctx:
-            color = "orange"; title = "📉 Rebound to Drop: เด้งเพื่อลง"; strat = "Sell on Rally"
-            adv = "การเด้งหลอกๆ (Fake Pump) ชนต้านไม่ผ่าน เป็นจังหวะขายออก"
-        elif "Sideway Down" in ctx:
-            color = "orange"; title = "⚖️ Sideway Down: รินขาย"; strat = "Reduce Port"
-            adv = "ดูเหมือนรับอยู่ แต่เงินไหลออก เสี่ยงหลุดแนวรับ ให้ลดพอร์ต"
-        else:
-            color = "orange"; title = "🐻 Bearish Pressure: แรงกดดันสูง"; strat = "Avoid"
-            adv = "แรงขายมากกว่าแรงซื้อ ไม่ควรรีบรับจนกว่าจะเห็นสัญญาณกลับตัว"
+        color = "orange"; title = "🐻 Bearish Pressure: แรงกดดันสูง"; strat = "Reduce Port"
+        adv = "แรงขายมากกว่าแรงซื้อ ระวังหลุดแนวรับ ไม่ควรรีบรับจนกว่าจะเห็นสัญญาณกลับตัว"
 
     if in_demand_zone: sl = active_zone['bottom'] - (atr_val*0.5)
     else: sl = price - (2*atr_val) if not np.isnan(atr_val) else price*0.95
@@ -525,18 +555,18 @@ if submit_btn:
     st.session_state['search_triggered'] = True
     st.session_state['last_symbol'] = symbol_input_raw
 
-# 2. เริ่มทำงานถ้ามีการ Trigger (ไม่ว่าจะกด Search หรือกด Save)
+# 2. เริ่มทำงานถ้ามีการ Trigger
 if st.session_state['search_triggered']:
-    symbol_input = st.session_state['last_symbol'] # ใช้ชื่อหุ้นจากความจำ
+    symbol_input = st.session_state['last_symbol']
     
     st.divider()
     st.markdown("""<style>body { overflow: auto !important; }</style>""", unsafe_allow_html=True)
     
-    with st.spinner(f"AI Hybrid Pro กำลังวิเคราะห์ {symbol_input} (Checking OBV & Patterns)..."):
+    with st.spinner(f"AI God Mode กำลังเจาะลึก {symbol_input} (Analyzing 4-Bar Pattern & Context)..."):
         # 1. Main Data
         df, info, df_mtf = get_data_hybrid(symbol_input, tf_code, mtf_code)
         
-        # 2. Safety Net Data (Week/Day สำหรับหาแนวรับ VIP)
+        # 2. Safety Net Data
         try:
             ticker_stats = yf.Ticker(symbol_input)
             df_stats_day = ticker_stats.history(period="2y", interval="1d")
@@ -545,11 +575,10 @@ if st.session_state['search_triggered']:
             df_stats_day = pd.DataFrame(); df_stats_week = pd.DataFrame()
 
     if df is not None and not df.empty and len(df) > 20: 
-        # --- Indicator Calculation (คำนวณค่าต่างๆ เพื่อป้อนให้ AI) ---
+        # --- Indicator Calculation ---
         df['EMA20'] = ta.ema(df['Close'], length=20)
         df['EMA50'] = ta.ema(df['Close'], length=50)
         
-        # Safe EMA200 Calculation
         ema200_series = ta.ema(df['Close'], length=200)
         df['EMA200'] = ema200_series if ema200_series is not None else np.nan
 
@@ -570,16 +599,13 @@ if st.session_state['search_triggered']:
         
         df['Vol_SMA20'] = ta.sma(df['Volume'], length=20)
         
-        # --- OBV & Slope Calculation (หัวใจสำคัญของ Logic ใหม่) ---
         df['OBV'] = ta.obv(df['Close'], df['Volume'])
         df['OBV_SMA20'] = ta.sma(df['OBV'], length=20)
-        # คำนวณ Slope 5 วัน เพื่อดูทิศทางเงินไหลเข้า/ออก
         df['OBV_Slope'] = ta.slope(df['OBV'], length=5) 
         
         df['Rolling_Min'] = df['Low'].rolling(window=20).min()
         df['Rolling_Max'] = df['High'].rolling(window=20).max()
         
-        # --- Relative BB Squeeze ---
         if bbu_col_name and bbl_col_name and 'EMA20' in df.columns:
             df['BB_Width'] = (df[bbu_col_name] - df[bbl_col_name]) / df['EMA20'] * 100
             df['BB_Width_Min20'] = df['BB_Width'].rolling(window=20).min()
@@ -587,21 +613,18 @@ if st.session_state['search_triggered']:
         else:
             is_squeeze = False
 
-        # --- Zones ---
         demand_zones = find_demand_zones(df, atr_multiplier=0.25)
         supply_zones = find_supply_zones(df, atr_multiplier=0.25)
         
-        # --- Prepare Last Values ---
         last = df.iloc[-1]
         price = info.get('regularMarketPrice') if info.get('regularMarketPrice') else last['Close']
         ema20 = last['EMA20'] if 'EMA20' in last else np.nan
         ema50 = last['EMA50'] if 'EMA50' in last else np.nan
         ema200 = last['EMA200'] if 'EMA200' in last else np.nan
         
-        # 🛑 SAFETY CHECK: ข้อมูล Week ไม่พอ
         if tf_code == "1wk":
             if ema200 is None or (isinstance(ema200, float) and np.isnan(ema200)):
-                st.error(f"⚠️ **ข้อมูลไม่เพียงพอสำหรับการคำนวณใน Timeframe Week** (ต้องการข้อมูลย้อนหลังอย่างน้อย 200 สัปดาห์)")
+                st.error(f"⚠️ **ข้อมูลไม่เพียงพอสำหรับ TF Week** (ต้องการ 200 สัปดาห์)")
                 st.stop() 
 
         rsi = last['RSI'] if 'RSI' in last else np.nan
@@ -622,11 +645,8 @@ if st.session_state['search_triggered']:
         try: obv_val = last['OBV']; obv_avg = last['OBV_SMA20']
         except: obv_val = np.nan; obv_avg = np.nan
         
-        # ดึงค่า Slope เพื่อส่งให้ AI
         obv_slope_val = last.get('OBV_Slope', np.nan)
-        rolling_min_val = last.get('Rolling_Min', np.nan)
-        rolling_max_val = last.get('Rolling_Max', np.nan)
-
+        
         mtf_trend = "Sideway"; mtf_ema200_val = 0
         if df_mtf is not None and not df_mtf.empty:
             if 'EMA200' not in df_mtf.columns: df_mtf['EMA200'] = ta.ema(df_mtf['Close'], length=200)
@@ -638,22 +658,61 @@ if st.session_state['search_triggered']:
         try: prev_open = df['Open'].iloc[-2]; prev_close = df['Close'].iloc[-2]; vol_avg = last['Vol_SMA20']
         except: prev_open = 0; prev_close = 0; vol_avg = 1
 
-        # 🧠 CALL THE UPGRADED AI BRAIN
+        # 🔑 KEY UPGRADE: ตัดข้อมูล 4 แท่ง
+        df_candles_4 = df.iloc[-4:] 
+
+        # 🧠 CALL GOD MODE BRAIN
         ai_report = ai_hybrid_analysis(price, ema20, ema50, ema200, rsi, macd_val, macd_signal, adx_val, bb_upper, bb_lower, 
                                        vol_status, mtf_trend, atr, mtf_ema200_val,
                                        open_p, high_p, low_p, close_p, obv_val, obv_avg,
                                        obv_slope_val, 
-                                       prev_open, prev_close, vol_now, vol_avg, demand_zones, is_squeeze)
+                                       prev_open, prev_close, vol_now, vol_avg, demand_zones, 
+                                       is_squeeze,
+                                       df_candles_4)
 
-        # Log Management
+        # --- LOG MANAGEMENT (อัปเกรด: แปลภาษา + เพิ่มช่อง) ---
         current_time = datetime.now().strftime("%H:%M:%S")
-        log_entry = { "เวลา": current_time, "หุ้น": symbol_input, "ราคา": f"{price:.2f}", "Score": f"{ai_report['status_color'].upper()}", "คำแนะนำ": ai_report['banner_title'].split(':')[0], "Action": ai_report['strategy'] }
+        
+        # 1. ดึง % Change
+        pct_change = info.get('regularMarketChangePercent', 0)
+        pct_str = f"{pct_change:+.2f}%" if pct_change is not None else "0.00%"
+
+        # 2. แปลง Action เป็นภาษาไทยง่ายๆ
+        raw_strat = ai_report['strategy']
+        if "Aggressive Buy" in raw_strat: th_action = "ลุยซื้อ (Aggressive)"
+        elif "Buy on Dip" in raw_strat: th_action = "ย่อซื้อ (Dip)"
+        elif "Accumulate" in raw_strat: th_action = "ทยอยสะสม"
+        elif "Wait" in raw_strat: th_action = "รอจังหวะ"
+        elif "No Trade" in raw_strat: th_action = "ทับมือ (ห้ามเล่น)"
+        elif "Exit" in raw_strat: th_action = "หนีตาย (Exit)"
+        elif "Reduce" in raw_strat: th_action = "ลดพอร์ต"
+        elif "Sell" in raw_strat: th_action = "เด้งขาย"
+        else: th_action = raw_strat # เผื่อกรณีอื่น
+
+        # 3. แปลง Score เป็นภาษาไทย
+        raw_color = ai_report['status_color']
+        if raw_color == "green": th_score = "🟢 ขาขึ้น (Bullish)"
+        elif raw_color == "red": th_score = "🔴 ขาลง (Bearish)"
+        elif raw_color == "orange": th_score = "🟠 เสี่ยง (Warning)"
+        else: th_score = "🟡 พักตัว (Neutral)"
+
+        log_entry = { 
+            "เวลา": current_time, 
+            "หุ้น": symbol_input, 
+            "TF": timeframe,  # <-- เพิ่ม TF
+            "ราคา": f"{price:.2f}", 
+            "Change%": pct_str, # <-- เพิ่ม %
+            "สถานะ": th_score, # <-- ใช้ภาษาไทย
+            "Action": th_action, # <-- ใช้ภาษาไทย
+            "SL": f"{ai_report['sl']:.2f}", 
+            "TP": f"{ai_report['tp']:.2f}"
+        }
         
         if submit_btn: 
             st.session_state['history_log'].insert(0, log_entry)
             if len(st.session_state['history_log']) > 10: st.session_state['history_log'] = st.session_state['history_log'][:10]
 
-        # --- DISPLAY UI (คงหน้าตาเดิมตามสั่ง) ---
+        # --- DISPLAY UI ---
         logo_url = f"https://financialmodelingprep.com/image-stock/{symbol_input}.png"
         fallback_url = "https://cdn-icons-png.flaticon.com/512/720/720453.png"
         icon_html = f"""<img src="{logo_url}" onerror="this.onerror=null; this.src='{fallback_url}';" style="height: 50px; width: 50px; border-radius: 50%; vertical-align: middle; margin-right: 10px; object-fit: contain; background-color: white; border: 1px solid #e0e0e0; padding: 2px;">"""
@@ -723,7 +782,6 @@ if st.session_state['search_triggered']:
 
             st.markdown(f"""<div style='background-color: var(--secondary-background-color); padding: 15px; border-radius: 10px; font-size: 0.95rem;'><div style='display:flex; justify-content:space-between; margin-bottom:5px; border-bottom:1px solid #ddd; font-weight:bold;'><span>Indicator</span> <span>Value</span></div><div style='display:flex; justify-content:space-between;'><span>EMA 20</span> <span>{e20_s}</span></div><div style='display:flex; justify-content:space-between;'><span>EMA 50</span> <span>{e50_s}</span></div><div style='display:flex; justify-content:space-between;'><span>EMA 200</span> <span>{e200_s}</span></div><div style='display:flex; justify-content:space-between;'><span>Volume ({vol_str})</span> <span style='color:{ai_report['vol_quality_color']}'>{ai_report['vol_quality_msg']}</span></div><div style='display:flex; justify-content:space-between;'><span>ATR</span> <span>{atr_s}</span></div><div style='display:flex; justify-content:space-between;'><span>BB (Up/Low)</span> <span>{bb_s}</span></div></div>""", unsafe_allow_html=True)
             
-            # --- DISTANCE FILTER SETTINGS ---
             if tf_code == "1h": min_dist = atr * 1.0 
             elif tf_code == "1wk": min_dist = atr * 2.0 
             else: min_dist = atr * 1.5 
@@ -852,24 +910,24 @@ if st.session_state['search_triggered']:
             sq_txt = "⚠️ Squeeze (อัดอั้นรอระเบิด)" if ai_report['is_squeeze'] else "Normal (ปกติ)"
             vol_q_col = ai_report['vol_quality_color']
             vol_txt = ai_report['vol_quality_msg']
-            obv_col = "#22c55e" if "Bullish" in ai_report['obv_insight'] else ("#ef4444" if "Bearish" in ai_report['obv_insight'] else "#6b7280")
+            obv_col = "#22c55e" if "Bullish" in ai_report['obv_insight'] or "ซื้อ" in ai_report['obv_insight'] else ("#ef4444" if "Bearish" in ai_report['obv_insight'] or "ขาย" in ai_report['obv_insight'] else "#6b7280")
             dz_status = "✅ อยู่ในโซน (In Zone)" if ai_report['in_demand_zone'] else "❌ นอกโซน (รอราคา)"
             
             st.markdown(f"""
             <div class='xray-box'>
-                <div class='xray-title'>🕯️ Deep Insight</div>
-                <div class='xray-item'><span>ทรงกราฟ:</span> <span style='font-weight:bold;'>{ai_report['candle_pattern']}</span></div>
+                <div class='xray-title'>🕯️ God Mode Insight</div>
+                <div class='xray-item'><span>ทรงกราฟ (4 Bars):</span> <span style='font-weight:bold;'>{ai_report['candle_pattern']}</span></div>
                 <div class='xray-item'><span>สถานะ:</span> <span>{ai_report['candle_color']}</span></div>
                 <div class='xray-item'><span>รายละเอียด:</span> <span style='font-style:italic;'>{ai_report['candle_detail']}</span></div>
                 <hr style='margin: 8px 0; opacity: 0.3;'>
                 <div class='xray-item'><span>🔥 ความผันผวน (BB):</span> <span style='color:{sq_col}; font-weight:bold;'>{sq_txt}</span></div>
                 <div class='xray-item'><span>📊 คุณภาพ Volume:</span> <span style='color:{vol_q_col}; font-weight:bold;'>{vol_txt}</span></div>
-                <div class='xray-item'><span>🌊 รายใหญ่ (OBV):</span> <span style='color:{obv_col}; font-weight:bold;'>{ai_report['obv_insight']}</span></div>
+                <div class='xray-item'><span>🌊 รายใหญ่ (Smart OBV):</span> <span style='color:{obv_col}; font-weight:bold;'>{ai_report['obv_insight']}</span></div>
                 <div class='xray-item'><span>🎯 Demand Zone:</span> <span style='font-weight:bold;'>{dz_status}</span></div>
             </div>
             """, unsafe_allow_html=True)
             
-            st.subheader("🤖 AI STRATEGY (Hybrid Pro)")
+            st.subheader("🤖 AI STRATEGY (God Mode)")
             color_map = {
                 "green": {"bg": "#dcfce7", "border": "#22c55e", "text": "#14532d"}, 
                 "red": {"bg": "#fee2e2", "border": "#ef4444", "text": "#7f1d1d"}, 
@@ -882,16 +940,16 @@ if st.session_state['search_triggered']:
             <div style="background-color: {c_theme['bg']}; border-left: 6px solid {c_theme['border']}; padding: 20px; border-radius: 10px; margin-bottom: 20px;">
                 <h2 style="color: {c_theme['text']}; margin:0 0 10px 0; font-size: 28px;">{ai_report['banner_title']}</h2>
                 <h3 style="color: {c_theme['text']}; margin:0 0 15px 0; font-size: 20px; opacity: 0.9;">{ai_report['strategy']}</h3>
-                <p style="color: {c_theme['text']}; font-size: 16px; margin:0; line-height: 1.6;"><b>💡 Insight:</b> {ai_report['context']}</p>
+                <p style="color: {c_theme['text']}; font-size: 16px; margin:0; line-height: 1.6;"><b>💡 Contextual Insight:</b> {ai_report['context']}</p>
             </div>
             """, unsafe_allow_html=True)
             
             with st.chat_message("assistant"):
                 if ai_report['bullish_factors']: 
-                    st.markdown("**🟢 ปัจจัยบวก:**")
+                    st.markdown("**🟢 ปัจจัยบวก (Bullish Factors):**")
                     for r in ai_report['bullish_factors']: st.write(f"- {r}")
                 if ai_report['bearish_factors']: 
-                    st.markdown("**🔴 ปัจจัยลบ/ความเสี่ยง:**")
+                    st.markdown("**🔴 ปัจจัยลบ/ความเสี่ยง (Bearish Factors):**")
                     for w in ai_report['bearish_factors']: st.write(f"- {w}")
                 
                 st.markdown("---")
@@ -900,14 +958,29 @@ if st.session_state['search_triggered']:
                 elif "red" in ai_report['status_color']: box_type = st.error
                 else: box_type = st.warning
                 
+                # --- LOGIC คำแนะนำแยก 2 กลุ่ม ---
+                strat = ai_report['strategy']
+                if "Buy" in strat or "Accumulate" in strat:
+                    adv_holder = "🟢 **ถือรันเทรนด์:** ยก Stop Loss ตามขึ้นไป อย่าเพิ่งรีบขายหมู"
+                    adv_none = f"🛒 **หาจังหวะเข้า:** ย่อตัวลงมาใกล้ `{ema20:.2f}` หรือไม่หลุด `{ai_report['sl']:.2f}` สะสมได้"
+                elif "Sell" in strat or "Exit" in strat or "Reduce" in strat:
+                    adv_holder = "🔴 **ลดพอร์ต/หนี:** สถานการณ์ไม่ดี เน้นรักษาเงินต้น หรือล็อคกำไร"
+                    adv_none = "✋ **ห้ามรับมีด:** ราคากำลังลงแรง อย่าเพิ่งสวน รอฐานชัดเจน"
+                else:
+                    adv_holder = "🟡 **ถือรอ:** ถ้าทุนต่ำถือต่อได้ แต่ถ้าหลุด Stop Loss ต้องหนี"
+                    adv_none = "👀 **เฝ้าดู:** ยังไม่ชัดเจน อย่าเพิ่งเข้าเทรด รอเลือกทางก่อน"
+
                 box_type(f"""
-                ### 📝 บทสรุปและคำแนะนำ (Action Plan)
+                ### 🎯 แผนการเทรด (Execution Plan)
                 
-                **1. สถานการณ์ (Context):** {ai_report['context']}
+                * 🎒 **สำหรับคนมีของ:** {adv_holder}
+                * 🛒 **สำหรับคนไม่มีของ:** {adv_none}
                 
-                **2. คำแนะนำ (Action):** 👉 **{ai_report['strategy']}** : {ai_report['holder_advice']}
+                ---
                 
-                **3. แผนการเทรด (Setup):** 🛑 **Stop Loss (หนี):** {ai_report['sl']:.2f}  |  ✅ **Take Profit (เป้า):** {ai_report['tp']:.2f}
+                **🧱 Setup (กรอบราคา):**
+                * 🛑 **Stop Loss (จุดหนี):** `{ai_report['sl']:.2f}`
+                * ✅ **Take Profit (เป้าหมาย):** `{ai_report['tp']:.2f}`
                 """)
 
         st.write(""); st.markdown("""<div class='disclaimer-box'>⚠️ <b>หมายเหตุ:</b> ข้อมูลนี้มาจากการวิเคราะห์ทางเทคนิคด้วยระบบ AI เพื่อประกอบการตัดสินใจเท่านั้น</div>""", unsafe_allow_html=True)
@@ -931,10 +1004,27 @@ if st.session_state['search_triggered']:
                         st.error("บันทึกไม่สำเร็จ โปรดตรวจสอบชื่อ Sheet หรือการแชร์สิทธิ์")
         
         st.divider()
-        st.subheader("📜 History Log (การค้นหาล่าสุด)")
+        st.subheader("📜 History Log (บันทึกการวิเคราะห์)")
         if st.session_state['history_log']: 
-            st.dataframe(pd.DataFrame(st.session_state['history_log']), use_container_width=True, hide_index=True)
+            df_hist = pd.DataFrame(st.session_state['history_log'])
+            
+            # เลือกโชว์เฉพาะคอลัมน์ที่จำเป็น (เพิ่ม SL, TP, Change%)
+            cols_to_show = ["เวลา", "หุ้น", "TF", "ราคา", "Change%", "สถานะ", "Action", "SL", "TP"]
+            final_cols = [c for c in cols_to_show if c in df_hist.columns]
+            
+            st.dataframe(
+                df_hist[final_cols], 
+                use_container_width=True, 
+                hide_index=True,
+                column_config={
+                    "หุ้น": st.column_config.TextColumn("Symbol", help="ชื่อหุ้น"),
+                    "สถานะ": st.column_config.TextColumn("Status", help="สถานะจาก God Mode"),
+                    "Change%": st.column_config.TextColumn("% Chg"),
+                    "SL": st.column_config.TextColumn("Stop Loss", help="จุดหนี"),
+                    "TP": st.column_config.TextColumn("Take Profit", help="เป้าขาย")
+                }
+            )
 
     else: 
-        st.error("ไม่พบข้อมูลหุ้น หรือข้อมูลไม่เพียงพอสำหรับคำนวณ")
+        st.error("ไม่พบข้อมูลหุ้น หรือข้อมูลไม่เพียงพอสำหรับคำนวณ (ต้องมีมากกว่า 20 แท่ง)")
 
