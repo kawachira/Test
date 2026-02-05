@@ -548,6 +548,7 @@ def ai_hybrid_analysis(price, ema20, ema50, ema200, rsi, macd_val, macd_sig, adx
         "in_demand_zone": in_demand_zone, "confluence_msg": confluence_msg,
         "is_squeeze": is_squeeze, "obv_insight": obv_insight
     }
+
 # --- 8. Main Execution & Display (ส่วนแสดงผลหลัก) ---
 
 # 1. อัปเดต State เมื่อกดปุ่มค้นหา
@@ -670,14 +671,12 @@ if st.session_state['search_triggered']:
                                        is_squeeze,
                                        df_candles_4)
 
-        # --- LOG MANAGEMENT (แปลภาษา + เพิ่มช่อง) ---
+        # --- LOG MANAGEMENT ---
         current_time = datetime.now().strftime("%H:%M:%S")
-        
-        # 1. ดึง % Change
         pct_change = info.get('regularMarketChangePercent', 0)
         pct_str = f"{pct_change:+.2f}%" if pct_change is not None else "0.00%"
 
-        # 2. แปลง Action เป็นภาษาไทย
+        # แปลง Action
         raw_strat = ai_report['strategy']
         if "Aggressive Buy" in raw_strat: th_action = "ลุยซื้อ (Aggressive)"
         elif "Buy on Dip" in raw_strat: th_action = "ย่อซื้อ (Dip)"
@@ -689,7 +688,7 @@ if st.session_state['search_triggered']:
         elif "Sell" in raw_strat: th_action = "เด้งขาย"
         else: th_action = raw_strat 
 
-        # 3. แปลง Score เป็นภาษาไทย
+        # แปลง Score
         raw_color = ai_report['status_color']
         if raw_color == "green": th_score = "🟢 ขาขึ้น (Bullish)"
         elif raw_color == "red": th_score = "🔴 ขาลง (Bearish)"
@@ -936,21 +935,17 @@ if st.session_state['search_triggered']:
             }
             c_theme = color_map.get(ai_report['status_color'], color_map["yellow"])
             
-            # 🔥 UPDATE: กล่อง Banner แบบใหม่ (รวมคำบรรยาย + Insight)
+            # 🔥 UPDATE 1: แก้ไข Banner ไม่ให้ HTML พัง
             st.markdown(f"""
             <div style="background-color: {c_theme['bg']}; border-left: 6px solid {c_theme['border']}; padding: 20px; border-radius: 10px; margin-bottom: 20px;">
                 <h2 style="color: {c_theme['text']}; margin:0 0 10px 0; font-size: 28px;">{ai_report['banner_title']}</h2>
-                
                 <div style="font-size: 20px; font-weight: bold; color: {c_theme['text']}; margin-bottom: 5px;">
                     {ai_report['strategy']}
                 </div>
-                
                 <div style="font-size: 18px; color: {c_theme['text']}; margin-bottom: 15px; line-height: 1.5;">
                     👉 {ai_report['holder_advice']}
                 </div>
-                
                 <hr style="border-top: 1px solid {c_theme['text']}; opacity: 0.2; margin: 10px 0;">
-                
                 <div style="font-size: 14px; color: {c_theme['text']}; opacity: 0.8;">
                     <b>💡 Insight:</b> {ai_report['context']}
                 </div>
@@ -971,19 +966,22 @@ if st.session_state['search_triggered']:
                 elif "red" in ai_report['status_color']: box_type = st.error
                 else: box_type = st.warning
                 
-                # --- LOGIC คำแนะนำแยก 2 กลุ่ม (Execution Plan Clean) ---
+                # --- 🔥 UPDATE 2: ปรับคำแนะนำ (เพิ่มราคา SL) ---
                 strat = ai_report['strategy']
+                sl_val = ai_report['sl']
+                sl_str_bold = f"**{sl_val:.2f}**"
+
                 if "Buy" in strat or "Accumulate" in strat:
-                    adv_holder = "🟢 **ถือรันเทรนด์:** ยก Stop Loss ตามขึ้นไป อย่าเพิ่งรีบขายหมู"
-                    adv_none = f"🛒 **หาจังหวะเข้า:** ย่อตัวลงมาใกล้ `{ema20:.2f}` หรือไม่หลุด `{ai_report['sl']:.2f}` สะสมได้"
+                    adv_holder = f"🟢 **ถือรันเทรนด์:** ยก Stop Loss ตามขึ้นไป (ระวังหลุด {sl_str_bold}) อย่าเพิ่งรีบขายหมู"
+                    adv_none = f"🛒 **หาจังหวะเข้า:** ย่อตัวลงมาใกล้ `{ema20:.2f}` หรือไม่หลุด `{sl_val:.2f}` สะสมได้"
                 elif "Sell" in strat or "Exit" in strat or "Reduce" in strat:
-                    adv_holder = "🔴 **ลดพอร์ต/หนี:** สถานการณ์ไม่ดี เน้นรักษาเงินต้น หรือล็อคกำไร"
+                    adv_holder = f"🔴 **ลดพอร์ต/หนี:** สถานการณ์ไม่ดี ถ้าหลุด {sl_str_bold} ต้องเลิก"
                     adv_none = "✋ **ห้ามรับมีด:** ราคากำลังลงแรง อย่าเพิ่งสวน รอฐานชัดเจน"
                 else:
-                    adv_holder = "🟡 **ถือรอ:** ถ้าทุนต่ำถือต่อได้ แต่ถ้าหลุด Stop Loss ต้องหนี"
+                    adv_holder = f"🟡 **ถือรอ:** ถ้าทุนต่ำถือต่อได้ แต่ถ้าหลุด {sl_str_bold} ต้องหนี"
                     adv_none = "👀 **เฝ้าดู:** ยังไม่ชัดเจน อย่าเพิ่งเข้าเทรด รอเลือกทางก่อน"
 
-                # 🔥 UPDATE: กล่องล่างแบบ Clean (ตัดส่วนซ้ำซ้อนออก)
+                # --- 🔥 UPDATE 3: ปรับ Format กรอบราคา (ไม่มี Bullet) ---
                 box_type(f"""
                 ### 🎯 แผนการเทรด (Execution Plan)
                 
@@ -993,8 +991,10 @@ if st.session_state['search_triggered']:
                 ---
                 
                 **🧱 Setup (กรอบราคา):**
-                * 🛑 **Stop Loss (จุดหนี):** `{ai_report['sl']:.2f}`
-                * ✅ **Take Profit (เป้าหมาย):** `{ai_report['tp']:.2f}`
+                
+                🛑 **SL :** **{ai_report['sl']:.2f}** (จุดหนี)
+                
+                ✅ **TP :** **{ai_report['tp']:.2f}** (จุดทำกำไร)
                 """)
 
         st.write(""); st.markdown("""<div class='disclaimer-box'>⚠️ <b>หมายเหตุ:</b> ข้อมูลนี้มาจากการวิเคราะห์ทางเทคนิคด้วยระบบ AI เพื่อประกอบการตัดสินใจเท่านั้น</div>""", unsafe_allow_html=True)
