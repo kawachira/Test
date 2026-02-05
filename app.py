@@ -679,12 +679,12 @@ if st.session_state['search_triggered']:
                                        is_squeeze,
                                        df_candles_4)
 
-        # --- LOG MANAGEMENT (แปลภาษา + เพิ่มช่อง) ---
+                # --- LOG MANAGEMENT (แก้ไขสูตร % Change ให้ถูกต้อง) ---
         current_time = datetime.now().strftime("%H:%M:%S")
         
-        # 1. ดึง % Change
+        # 1. ดึง % Change และ *คูณ 100* เพื่อให้เป็นเปอร์เซ็นต์ที่ถูกต้อง
         pct_change = info.get('regularMarketChangePercent', 0)
-        pct_str = f"{pct_change:+.2f}%" if pct_change is not None else "0.00%"
+        pct_str = f"{pct_change * 100:+.2f}%" if pct_change is not None else "0.00%" 
 
         # 2. แปลง Action เป็นภาษาไทย
         raw_strat = ai_report['strategy']
@@ -710,7 +710,7 @@ if st.session_state['search_triggered']:
             "หุ้น": symbol_input, 
             "TF": timeframe, 
             "ราคา": f"{price:.2f}", 
-            "Change%": pct_str,
+            "Change%": pct_str, # <--- ค่านี้จะถูกต้องแล้วครับ
             "สถานะ": th_score,
             "Action": th_action,
             "SL": f"{ai_report['sl']:.2f}", 
@@ -720,6 +720,7 @@ if st.session_state['search_triggered']:
         if submit_btn: 
             st.session_state['history_log'].insert(0, log_entry)
             if len(st.session_state['history_log']) > 10: st.session_state['history_log'] = st.session_state['history_log'][:10]
+
 
         # --- DISPLAY UI ---
         logo_url = f"https://financialmodelingprep.com/image-stock/{symbol_input}.png"
