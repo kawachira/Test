@@ -658,7 +658,7 @@ if st.session_state['search_triggered']:
         try: prev_open = df['Open'].iloc[-2]; prev_close = df['Close'].iloc[-2]; vol_avg = last['Vol_SMA20']
         except: prev_open = 0; prev_close = 0; vol_avg = 1
 
-        # 🔑 KEY UPGRADE: ตัดข้อมูล 4 แท่ง
+        # 🔑 ตัดข้อมูล 4 แท่ง
         df_candles_4 = df.iloc[-4:] 
 
         # 🧠 CALL GOD MODE BRAIN
@@ -670,14 +670,14 @@ if st.session_state['search_triggered']:
                                        is_squeeze,
                                        df_candles_4)
 
-        # --- LOG MANAGEMENT (อัปเกรด: แปลภาษา + เพิ่มช่อง) ---
+        # --- LOG MANAGEMENT (แปลภาษา + เพิ่มช่อง) ---
         current_time = datetime.now().strftime("%H:%M:%S")
         
         # 1. ดึง % Change
         pct_change = info.get('regularMarketChangePercent', 0)
         pct_str = f"{pct_change:+.2f}%" if pct_change is not None else "0.00%"
 
-        # 2. แปลง Action เป็นภาษาไทยง่ายๆ
+        # 2. แปลง Action เป็นภาษาไทย
         raw_strat = ai_report['strategy']
         if "Aggressive Buy" in raw_strat: th_action = "ลุยซื้อ (Aggressive)"
         elif "Buy on Dip" in raw_strat: th_action = "ย่อซื้อ (Dip)"
@@ -687,7 +687,7 @@ if st.session_state['search_triggered']:
         elif "Exit" in raw_strat: th_action = "หนีตาย (Exit)"
         elif "Reduce" in raw_strat: th_action = "ลดพอร์ต"
         elif "Sell" in raw_strat: th_action = "เด้งขาย"
-        else: th_action = raw_strat # เผื่อกรณีอื่น
+        else: th_action = raw_strat 
 
         # 3. แปลง Score เป็นภาษาไทย
         raw_color = ai_report['status_color']
@@ -699,11 +699,11 @@ if st.session_state['search_triggered']:
         log_entry = { 
             "เวลา": current_time, 
             "หุ้น": symbol_input, 
-            "TF": timeframe,  # <-- เพิ่ม TF
+            "TF": timeframe, 
             "ราคา": f"{price:.2f}", 
-            "Change%": pct_str, # <-- เพิ่ม %
-            "สถานะ": th_score, # <-- ใช้ภาษาไทย
-            "Action": th_action, # <-- ใช้ภาษาไทย
+            "Change%": pct_str,
+            "สถานะ": th_score,
+            "Action": th_action,
             "SL": f"{ai_report['sl']:.2f}", 
             "TP": f"{ai_report['tp']:.2f}"
         }
@@ -936,11 +936,24 @@ if st.session_state['search_triggered']:
             }
             c_theme = color_map.get(ai_report['status_color'], color_map["yellow"])
             
+            # 🔥 UPDATE: กล่อง Banner แบบใหม่ (รวมคำบรรยาย + Insight)
             st.markdown(f"""
             <div style="background-color: {c_theme['bg']}; border-left: 6px solid {c_theme['border']}; padding: 20px; border-radius: 10px; margin-bottom: 20px;">
                 <h2 style="color: {c_theme['text']}; margin:0 0 10px 0; font-size: 28px;">{ai_report['banner_title']}</h2>
-                <h3 style="color: {c_theme['text']}; margin:0 0 15px 0; font-size: 20px; opacity: 0.9;">{ai_report['strategy']}</h3>
-                <p style="color: {c_theme['text']}; font-size: 16px; margin:0; line-height: 1.6;"><b>💡 Contextual Insight:</b> {ai_report['context']}</p>
+                
+                <div style="font-size: 20px; font-weight: bold; color: {c_theme['text']}; margin-bottom: 5px;">
+                    {ai_report['strategy']}
+                </div>
+                
+                <div style="font-size: 18px; color: {c_theme['text']}; margin-bottom: 15px; line-height: 1.5;">
+                    👉 {ai_report['holder_advice']}
+                </div>
+                
+                <hr style="border-top: 1px solid {c_theme['text']}; opacity: 0.2; margin: 10px 0;">
+                
+                <div style="font-size: 14px; color: {c_theme['text']}; opacity: 0.8;">
+                    <b>💡 Insight:</b> {ai_report['context']}
+                </div>
             </div>
             """, unsafe_allow_html=True)
             
@@ -958,7 +971,7 @@ if st.session_state['search_triggered']:
                 elif "red" in ai_report['status_color']: box_type = st.error
                 else: box_type = st.warning
                 
-                # --- LOGIC คำแนะนำแยก 2 กลุ่ม ---
+                # --- LOGIC คำแนะนำแยก 2 กลุ่ม (Execution Plan Clean) ---
                 strat = ai_report['strategy']
                 if "Buy" in strat or "Accumulate" in strat:
                     adv_holder = "🟢 **ถือรันเทรนด์:** ยก Stop Loss ตามขึ้นไป อย่าเพิ่งรีบขายหมู"
@@ -970,6 +983,7 @@ if st.session_state['search_triggered']:
                     adv_holder = "🟡 **ถือรอ:** ถ้าทุนต่ำถือต่อได้ แต่ถ้าหลุด Stop Loss ต้องหนี"
                     adv_none = "👀 **เฝ้าดู:** ยังไม่ชัดเจน อย่าเพิ่งเข้าเทรด รอเลือกทางก่อน"
 
+                # 🔥 UPDATE: กล่องล่างแบบ Clean (ตัดส่วนซ้ำซ้อนออก)
                 box_type(f"""
                 ### 🎯 แผนการเทรด (Execution Plan)
                 
