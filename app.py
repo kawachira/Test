@@ -684,7 +684,7 @@ if st.session_state['search_triggered']:
         
         # 1. ดึง % Change
         pct_change = info.get('regularMarketChangePercent', 0)
-        pct_str = f"{pct_change:+.2f}%" if pct_change is not None else "0.00%"
+        pct_str = f"{pct_change * 100:+.2f}%" if pct_change is not None else "0.00%"
 
         # 2. แปลง Action เป็นภาษาไทย
         raw_strat = ai_report['strategy']
