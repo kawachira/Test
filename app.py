@@ -228,6 +228,7 @@ def get_adx_interpretation(adx, is_uptrend):
     return "Weak/Sideway (ตลาดไร้ทิศทาง)"
 
 # --- Google Sheets Function ---
+# --- แก้ไขฟังก์ชัน save_to_gsheet ให้รับค่าครบทุกช่อง ---
 def save_to_gsheet(data_dict):
     try:
         scope = ['https://spreadsheets.google.com/feeds', 'https://www.googleapis.com/auth/drive']
@@ -236,17 +237,25 @@ def save_to_gsheet(data_dict):
             creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
             client = gspread.authorize(creds)
             sheet = client.open("Stock_Analysis_Log").sheet1
+            
+            # จัดเรียงข้อมูลลงคอลัมน์ (ต้องตรงกับ Log Entry)
             row = [
-                datetime.now().strftime("%Y-%m-%d"), datetime.now().strftime("%H:%M:%S"),
-                data_dict.get("หุ้น", ""), data_dict.get("ราคา", ""),
-                data_dict.get("Score", ""), data_dict.get("คำแนะนำ", ""), data_dict.get("Action", ""),
+                datetime.now().strftime("%Y-%m-%d"), # A: วันที่
+                data_dict.get("เวลา", ""),           # B: เวลา
+                data_dict.get("หุ้น", ""),           # C: ชื่อหุ้น
+                data_dict.get("TF", ""),             # D: Timeframe (เพิ่มใหม่)
+                data_dict.get("ราคา", ""),           # E: ราคา
+                data_dict.get("Change%", ""),        # F: % เปลี่ยนแปลง (เพิ่มใหม่)
+                data_dict.get("สถานะ", ""),          # G: สถานะ (เพิ่มใหม่)
+                data_dict.get("Action", ""),         # H: คำแนะนำ
+                data_dict.get("SL", ""),             # I: Stop Loss (เพิ่มใหม่)
+                data_dict.get("TP", "")              # J: Take Profit (เพิ่มใหม่)
             ]
             sheet.append_row(row)
             return True
         return False
     except Exception as e:
         return False
-
 # --- SMC: Find Zones ---
 def find_demand_zones(df, atr_multiplier=0.25):
     zones = []
@@ -548,7 +557,6 @@ def ai_hybrid_analysis(price, ema20, ema50, ema200, rsi, macd_val, macd_sig, adx
         "in_demand_zone": in_demand_zone, "confluence_msg": confluence_msg,
         "is_squeeze": is_squeeze, "obv_insight": obv_insight
     }
-
 # --- 8. Main Execution & Display (ส่วนแสดงผลหลัก) ---
 
 # 1. อัปเดต State เมื่อกดปุ่มค้นหา
@@ -671,12 +679,14 @@ if st.session_state['search_triggered']:
                                        is_squeeze,
                                        df_candles_4)
 
-        # --- LOG MANAGEMENT ---
+        # --- LOG MANAGEMENT (แปลภาษา + เพิ่มช่อง) ---
         current_time = datetime.now().strftime("%H:%M:%S")
+        
+        # 1. ดึง % Change
         pct_change = info.get('regularMarketChangePercent', 0)
         pct_str = f"{pct_change:+.2f}%" if pct_change is not None else "0.00%"
 
-        # แปลง Action
+        # 2. แปลง Action เป็นภาษาไทย
         raw_strat = ai_report['strategy']
         if "Aggressive Buy" in raw_strat: th_action = "ลุยซื้อ (Aggressive)"
         elif "Buy on Dip" in raw_strat: th_action = "ย่อซื้อ (Dip)"
@@ -688,12 +698,12 @@ if st.session_state['search_triggered']:
         elif "Sell" in raw_strat: th_action = "เด้งขาย"
         else: th_action = raw_strat 
 
-        # แปลง Score
+        # 3. แปลง Score เป็นภาษาไทย
         raw_color = ai_report['status_color']
-        if raw_color == "green": th_score = "🟢 ขาขึ้น (Bullish)"
-        elif raw_color == "red": th_score = "🔴 ขาลง (Bearish)"
-        elif raw_color == "orange": th_score = "🟠 เสี่ยง (Warning)"
-        else: th_score = "🟡 พักตัว (Neutral)"
+        if raw_color == "green": th_score = "🟢 ขาขึ้น"
+        elif raw_color == "red": th_score = "🔴 ขาลง"
+        elif raw_color == "orange": th_score = "🟠 เสี่ยง"
+        else: th_score = "🟡 พักตัว"
 
         log_entry = { 
             "เวลา": current_time, 
@@ -935,7 +945,6 @@ if st.session_state['search_triggered']:
             }
             c_theme = color_map.get(ai_report['status_color'], color_map["yellow"])
             
-            # 🔥 UPDATE 1: แก้ไข Banner ไม่ให้ HTML พัง
             st.markdown(f"""
             <div style="background-color: {c_theme['bg']}; border-left: 6px solid {c_theme['border']}; padding: 20px; border-radius: 10px; margin-bottom: 20px;">
                 <h2 style="color: {c_theme['text']}; margin:0 0 10px 0; font-size: 28px;">{ai_report['banner_title']}</h2>
@@ -966,10 +975,11 @@ if st.session_state['search_triggered']:
                 elif "red" in ai_report['status_color']: box_type = st.error
                 else: box_type = st.warning
                 
-                # --- 🔥 UPDATE 2: ปรับคำแนะนำ (เพิ่มราคา SL) ---
+                # --- 🔥 UPDATE: คำแนะนำแยกกลุ่ม + ราคา SL ตัวหนา ---
                 strat = ai_report['strategy']
                 sl_val = ai_report['sl']
-                sl_str_bold = f"**{sl_val:.2f}**"
+                tp_val = ai_report['tp']
+                sl_str_bold = f"**{sl_val:.2f}**" # ตัวหนา
 
                 if "Buy" in strat or "Accumulate" in strat:
                     adv_holder = f"🟢 **ถือรันเทรนด์:** ยก Stop Loss ตามขึ้นไป (ระวังหลุด {sl_str_bold}) อย่าเพิ่งรีบขายหมู"
@@ -981,7 +991,7 @@ if st.session_state['search_triggered']:
                     adv_holder = f"🟡 **ถือรอ:** ถ้าทุนต่ำถือต่อได้ แต่ถ้าหลุด {sl_str_bold} ต้องหนี"
                     adv_none = "👀 **เฝ้าดู:** ยังไม่ชัดเจน อย่าเพิ่งเข้าเทรด รอเลือกทางก่อน"
 
-                # --- 🔥 UPDATE 3: ปรับ Format กรอบราคา (ไม่มี Bullet) ---
+                # --- 🔥 UPDATE: รูปแบบกล่อง Setup ตามสั่ง (ลบ Bullet, เพิ่ม Emoji) ---
                 box_type(f"""
                 ### 🎯 แผนการเทรด (Execution Plan)
                 
@@ -992,9 +1002,9 @@ if st.session_state['search_triggered']:
                 
                 **🧱 Setup (กรอบราคา):**
                 
-                🛑 **SL :** **{ai_report['sl']:.2f}** (จุดหนี)
+                🛑 **SL :** **{sl_val:.2f}** (จุดหนี)
                 
-                ✅ **TP :** **{ai_report['tp']:.2f}** (จุดทำกำไร)
+                ✅ **TP :** **{tp_val:.2f}** (จุดทำกำไร)
                 """)
 
         st.write(""); st.markdown("""<div class='disclaimer-box'>⚠️ <b>หมายเหตุ:</b> ข้อมูลนี้มาจากการวิเคราะห์ทางเทคนิคด้วยระบบ AI เพื่อประกอบการตัดสินใจเท่านั้น</div>""", unsafe_allow_html=True)
