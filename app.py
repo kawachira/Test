@@ -813,8 +813,10 @@ if st.session_state['search_triggered']:
                 except: w_ema50 = np.nan
                 try: w_ema200 = ta.ema(df_stats_week['Close'], length=200).iloc[-1]
                 except: w_ema200 = np.nan
-                if not np.isnan(w_ema50) and w_ema50 < price: candidates_supp.append({'val': w_ema50, 'label': "EMA 50 (TF Week - ต้านระยะยาว)"})
-                if not np.isnan(w_ema200) and w_ema200 < price: candidates_supp.append({'val': w_ema200, 'label': "🛡️ EMA 200 (TF Week - ต้านระดับกองทุน)"})
+                
+                # 🔥 FIX: เปลี่ยนคำว่า "ต้าน" เป็น "รับ" ในส่วน Support
+                if not np.isnan(w_ema50) and w_ema50 < price: candidates_supp.append({'val': w_ema50, 'label': "EMA 50 (TF Week - รับระยะยาว)"})
+                if not np.isnan(w_ema200) and w_ema200 < price: candidates_supp.append({'val': w_ema200, 'label': "🛡️ EMA 200 (TF Week - รับระดับกองทุน)"})
 
             if demand_zones:
                 for z in demand_zones: candidates_supp.append({'val': z['bottom'], 'label': f"Demand Zone [{z['bottom']:.2f}-{z['top']:.2f}]"})
@@ -870,6 +872,8 @@ if st.session_state['search_triggered']:
                 except: w_ema50 = np.nan
                 try: w_ema200 = ta.ema(df_stats_week['Close'], length=200).iloc[-1]
                 except: w_ema200 = np.nan
+                
+                # 🔥 FIX: ตรวจสอบคำว่า "ต้าน" ในส่วน Resistance
                 if not np.isnan(w_ema50) and w_ema50 > price: candidates_res.append({'val': w_ema50, 'label': "EMA 50 (TF Week - ต้านระยะยาว)"})
                 if not np.isnan(w_ema200) and w_ema200 > price: candidates_res.append({'val': w_ema200, 'label': "🛡️ EMA 200 (TF Week - ต้านระดับกองทุน)"})
                 
@@ -1049,8 +1053,6 @@ if st.session_state['search_triggered']:
         with c_reset:
             if st.button("⚠️ รีเซ็ต Google Sheet", type="secondary"):
                 with st.spinner("กำลังล้างข้อมูลใน Google Sheet..."):
-                    # ต้องมีฟังก์ชัน reset_gsheet ใน Part 1 ถึงจะใช้ปุ่มนี้ได้
-                    # ถ้าไม่มีฟังก์ชันนี้ ให้ลบปุ่มนี้ออก หรือไปเพิ่มฟังก์ชันใน Part 1
                     try:
                         scope = ['https://spreadsheets.google.com/feeds', 'https://www.googleapis.com/auth/drive']
                         if "gcp_service_account" in st.secrets:
@@ -1089,7 +1091,5 @@ if st.session_state['search_triggered']:
 
     else: 
         st.error("ไม่พบข้อมูลหุ้น หรือข้อมูลไม่เพียงพอสำหรับคำนวณ (ต้องมีมากกว่า 20 แท่ง)")
-
-
 
 
