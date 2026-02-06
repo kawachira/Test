@@ -584,7 +584,7 @@ if st.session_state['search_triggered']:
             df_stats_day = pd.DataFrame(); df_stats_week = pd.DataFrame()
 
     if df is not None and not df.empty and len(df) > 20: 
-        # --- Indicator Calculation ---
+        # --- Indicator Calculation (เหมือนเดิม) ---
         df['EMA20'] = ta.ema(df['Close'], length=20)
         df['EMA50'] = ta.ema(df['Close'], length=50)
         
@@ -679,12 +679,12 @@ if st.session_state['search_triggered']:
                                        is_squeeze,
                                        df_candles_4)
 
-                # --- LOG MANAGEMENT (แก้ไขสูตร % Change ให้ถูกต้อง) ---
+        # --- LOG MANAGEMENT (แปลภาษา + เพิ่มช่อง) ---
         current_time = datetime.now().strftime("%H:%M:%S")
         
-        # 1. ดึง % Change และ *คูณ 100* เพื่อให้เป็นเปอร์เซ็นต์ที่ถูกต้อง
+        # 1. ดึง % Change
         pct_change = info.get('regularMarketChangePercent', 0)
-        pct_str = f"{pct_change * 100:+.2f}%" if pct_change is not None else "0.00%" 
+        pct_str = f"{pct_change * 100:+.2f}%" if pct_change is not None else "0.00%"
 
         # 2. แปลง Action เป็นภาษาไทย
         raw_strat = ai_report['strategy']
@@ -710,7 +710,7 @@ if st.session_state['search_triggered']:
             "หุ้น": symbol_input, 
             "TF": timeframe, 
             "ราคา": f"{price:.2f}", 
-            "Change%": pct_str, # <--- ค่านี้จะถูกต้องแล้วครับ
+            "Change%": pct_str,
             "สถานะ": th_score,
             "Action": th_action,
             "SL": f"{ai_report['sl']:.2f}", 
@@ -720,7 +720,6 @@ if st.session_state['search_triggered']:
         if submit_btn: 
             st.session_state['history_log'].insert(0, log_entry)
             if len(st.session_state['history_log']) > 10: st.session_state['history_log'] = st.session_state['history_log'][:10]
-
 
         # --- DISPLAY UI ---
         logo_url = f"https://financialmodelingprep.com/image-stock/{symbol_input}.png"
@@ -946,6 +945,7 @@ if st.session_state['search_triggered']:
             }
             c_theme = color_map.get(ai_report['status_color'], color_map["yellow"])
             
+            # --- ส่วนที่ 1: AI Strategy Banner ---
             st.markdown(f"""
             <div style="background-color: {c_theme['bg']}; border-left: 6px solid {c_theme['border']}; padding: 20px; border-radius: 10px; margin-bottom: 20px;">
                 <h2 style="color: {c_theme['text']}; margin:0 0 10px 0; font-size: 28px;">{ai_report['banner_title']}</h2>
@@ -956,12 +956,54 @@ if st.session_state['search_triggered']:
                     👉 {ai_report['holder_advice']}
                 </div>
                 <hr style="border-top: 1px solid {c_theme['text']}; opacity: 0.2; margin: 10px 0;">
-                <div style="font-size: 14px; color: {c_theme['text']}; opacity: 0.8;">
+                <div style="font-size: 16px; color: {c_theme['text']}; opacity: 0.9;">
                     <b>💡 Insight:</b> {ai_report['context']}
                 </div>
             </div>
             """, unsafe_allow_html=True)
             
+            # --- คำนวณ Logic แผนการเทรดก่อนแสดงผล ---
+            strat = ai_report['strategy']
+            sl_val = ai_report['sl']
+            tp_val = ai_report['tp']
+            sl_str_bold = f"**{sl_val:.2f}**"
+
+            if price < ema20:
+                entry_txt = f"บริเวณนี้ (`{price:.2f}`) หรือแนวรับ"
+            else:
+                entry_txt = f"ย่อตัวลงมาใกล้ `{ema20:.2f}`"
+
+            if "Buy" in strat or "Accumulate" in strat:
+                adv_holder = f"🟢 **ถือรันเทรนด์:** ยก Stop Loss ตามขึ้นไป (ระวังหลุด {sl_str_bold}) อย่าเพิ่งรีบขายหมู"
+                adv_none = f"🛒 **หาจังหวะเข้า:** {entry_txt} โดยห้ามหลุด `{sl_val:.2f}`"
+            elif "Sell" in strat or "Exit" in strat or "Reduce" in strat:
+                adv_holder = f"🔴 **ลดพอร์ต/หนี:** สถานการณ์ไม่ดี ถ้าหลุด {sl_str_bold} ต้องเลิก"
+                adv_none = "✋ **ห้ามรับมีด:** ราคากำลังลงแรง อย่าเพิ่งสวน รอฐานชัดเจน"
+            else:
+                adv_holder = f"🟡 **ถือรอ:** ถ้าทุนต่ำถือต่อได้ แต่ถ้าหลุด {sl_str_bold} ต้องหนี"
+                adv_none = "👀 **เฝ้าดู:** ยังไม่ชัดเจน อย่าเพิ่งเข้าเทรด รอเลือกทางก่อน"
+
+            # --- ส่วนที่ 2: Execution Plan (ย้ายขึ้นมา & ปรับดีไซน์ให้สมส่วน) ---
+            st.markdown(f"""
+            <div style="background-color: {c_theme['bg']}; border-left: 6px solid {c_theme['border']}; padding: 20px; border-radius: 10px; margin-bottom: 20px;">
+                <h3 style="color: {c_theme['text']}; margin:0 0 15px 0; font-size: 22px;">🎯 แผนการเทรด (Execution Plan)</h3>
+                
+                <div style="margin-bottom: 15px; font-size: 16px; color: {c_theme['text']};">
+                    <div style="margin-bottom: 8px;">🎒 <b>สำหรับคนมีของ:</b><br>{adv_holder}</div>
+                    <div>🛒 <b>สำหรับคนไม่มีของ:</b><br>{adv_none}</div>
+                </div>
+                
+                <hr style="border-top: 1px solid {c_theme['text']}; opacity: 0.2; margin: 15px 0;">
+                
+                <div style="font-size: 16px; color: {c_theme['text']};">
+                    <b>🧱 Setup (กรอบราคา):</b><br>
+                    <span style="display:inline-block; margin-top:5px;">🛑 <b>SL :</b> <b>{sl_val:.2f}</b> (จุดหนี)</span><br>
+                    <span style="display:inline-block; margin-top:5px;">✅ <b>TP :</b> <b>{tp_val:.2f}</b> (จุดทำกำไร)</span>
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
+
+            # --- ส่วนที่ 3: Bullish/Bearish Factors (ย้ายลงมาล่างสุด) ---
             with st.chat_message("assistant"):
                 if ai_report['bullish_factors']: 
                     st.markdown("**🟢 ปัจจัยบวก (Bullish Factors):**")
@@ -969,55 +1011,6 @@ if st.session_state['search_triggered']:
                 if ai_report['bearish_factors']: 
                     st.markdown("**🔴 ปัจจัยลบ/ความเสี่ยง (Bearish Factors):**")
                     for w in ai_report['bearish_factors']: st.write(f"- {w}")
-                
-                st.markdown("---")
-                
-                if "green" in ai_report['status_color']: box_type = st.success
-                elif "red" in ai_report['status_color']: box_type = st.error
-                else: box_type = st.warning
-                
-                               # --- 🔥 UPDATE LOGIC: แก้บ้คแนะนำราคาเข้า (Smart Entry) ---
-                strat = ai_report['strategy']
-                sl_val = ai_report['sl']
-                tp_val = ai_report['tp']
-                sl_str_bold = f"**{sl_val:.2f}**"
-
-                # คำนวณจุดเข้าซื้อที่สมเหตุสมผล (Entry Logic)
-                if price < ema20:
-                    # ถ้าราคาต่ำกว่าเส้นค่าเฉลี่ย (ของถูก) -> ให้รับแถวนี้เลย หรือรอที่แนวรับถัดไป
-                    entry_txt = f"บริเวณนี้ (`{price:.2f}`) หรือแนวรับ"
-                else:
-                    # ถ้าราคาสูงกว่าเส้น (ของแพง) -> ให้รอย่อมาหาเส้น
-                    entry_txt = f"ย่อตัวลงมาใกล้ `{ema20:.2f}`"
-
-                if "Buy" in strat or "Accumulate" in strat:
-                    adv_holder = f"🟢 **ถือรันเทรนด์:** ยก Stop Loss ตามขึ้นไป (ระวังหลุด {sl_str_bold}) อย่าเพิ่งรีบขายหมู"
-                    adv_none = f"🛒 **หาจังหวะเข้า:** {entry_txt} โดยห้ามหลุด `{sl_val:.2f}`"
-                
-                elif "Sell" in strat or "Exit" in strat or "Reduce" in strat:
-                    adv_holder = f"🔴 **ลดพอร์ต/หนี:** สถานการณ์ไม่ดี ถ้าหลุด {sl_str_bold} ต้องเลิก"
-                    adv_none = "✋ **ห้ามรับมีด:** ราคากำลังลงแรง อย่าเพิ่งสวน รอฐานชัดเจน"
-                
-                else:
-                    adv_holder = f"🟡 **ถือรอ:** ถ้าทุนต่ำถือต่อได้ แต่ถ้าหลุด {sl_str_bold} ต้องหนี"
-                    adv_none = "👀 **เฝ้าดู:** ยังไม่ชัดเจน อย่าเพิ่งเข้าเทรด รอเลือกทางก่อน"
-
-                # --- 🔥 UPDATE 3: ปรับ Format กรอบราคา (ไม่มี Bullet) ---
-                box_type(f"""
-                ### 🎯 แผนการเทรด (Execution Plan)
-                
-                * 🎒 **สำหรับคนมีของ:** {adv_holder}
-                * 🛒 **สำหรับคนไม่มีของ:** {adv_none}
-                
-                ---
-                
-                **🧱 Setup (กรอบราคา):**
-                
-                🛑 **SL :** **{sl_val:.2f}** (จุดหนี)
-                
-                ✅ **TP :** **{tp_val:.2f}** (จุดทำกำไร)
-                """)
-
 
         st.write(""); st.markdown("""<div class='disclaimer-box'>⚠️ <b>หมายเหตุ:</b> ข้อมูลนี้มาจากการวิเคราะห์ทางเทคนิคด้วยระบบ AI เพื่อประกอบการตัดสินใจเท่านั้น</div>""", unsafe_allow_html=True)
         
@@ -1040,7 +1033,33 @@ if st.session_state['search_triggered']:
                         st.error("บันทึกไม่สำเร็จ โปรดตรวจสอบชื่อ Sheet หรือการแชร์สิทธิ์")
         
         st.divider()
-        st.subheader("📜 History Log (บันทึกการวิเคราะห์)")
+        # แบ่งคอลัมน์: ซ้ายชื่อหัวข้อ / ขวาปุ่มล้าง
+        c_head, c_reset = st.columns([3, 1]) 
+        
+        with c_head:
+            st.subheader("📜 History Log (บันทึกการวิเคราะห์)")
+            
+        with c_reset:
+            if st.button("⚠️ รีเซ็ต Google Sheet", type="secondary"):
+                with st.spinner("กำลังล้างข้อมูลใน Google Sheet..."):
+                    # ต้องมีฟังก์ชัน reset_gsheet ใน Part 1 ถึงจะใช้ปุ่มนี้ได้
+                    # ถ้าไม่มีฟังก์ชันนี้ ให้ลบปุ่มนี้ออก หรือไปเพิ่มฟังก์ชันใน Part 1
+                    try:
+                        scope = ['https://spreadsheets.google.com/feeds', 'https://www.googleapis.com/auth/drive']
+                        if "gcp_service_account" in st.secrets:
+                            creds_dict = dict(st.secrets["gcp_service_account"])
+                            creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
+                            client = gspread.authorize(creds)
+                            sheet = client.open("Stock_Analysis_Log").sheet1
+                            sheet.resize(rows=1)
+                            sheet.resize(rows=1000)
+                            st.toast("ล้างข้อมูลเรียบร้อยแล้ว!", icon="🧹")
+                            st.session_state['history_log'] = [] 
+                            time.sleep(1)
+                            st.rerun()
+                    except:
+                        st.error("เกิดข้อผิดพลาด หรือยังไม่ได้ตั้งค่า Google Sheet")
+
         if st.session_state['history_log']: 
             df_hist = pd.DataFrame(st.session_state['history_log'])
             
