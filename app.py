@@ -569,7 +569,19 @@ if st.session_state['search_triggered']:
     symbol_input = st.session_state['last_symbol']
     
     st.divider()
-    st.markdown("""<style>body { overflow: auto !important; }</style>""", unsafe_allow_html=True)
+    
+    # 🔥 UPDATE: เพิ่ม CSS บังคับให้หัวข้อ Expander (Warning) ตัวใหญ่และหนาขึ้น
+    st.markdown("""
+    <style>
+    body { overflow: auto !important; }
+    /* บังคับฟอนต์หัวข้อ Expander ให้ใหญ่และหนา */
+    div[data-testid="stExpander"] details summary p {
+        font-size: 18px !important;
+        font-weight: 700 !important;
+        color: #333333 !important;
+    }
+    </style>
+    """, unsafe_allow_html=True)
     
     with st.spinner(f"AI God Mode กำลังเจาะลึก {symbol_input} (Analyzing 4-Bar Pattern & Context)..."):
         # 1. Main Data
@@ -846,7 +858,7 @@ if st.session_state['search_triggered']:
                 next_res_desc = best_res['label']
 
             # ----------------------------------------------------
-            # 3. 🚦 DISPLAY ALERTS (แสดงผลแจ้งเตือน - Expander)
+            # 3. 🚦 DISPLAY ALERTS (แสดงผลแจ้งเตือน - Expander ตัวใหญ่)
             # ----------------------------------------------------
 
             # A. 🚨 CASE BREAKDOWN (หลุดแนวรับ - Expander)
@@ -858,8 +870,8 @@ if st.session_state['search_triggered']:
                 else:
                     prediction_txt = "🌑 <b>คาดการณ์:</b> หลุดทุกแนวรับสำคัญ! (Blue Sky Down) ระวังการลงไม่มีก้นเหว"
 
-                # 🔥 ใช้ Expander ซ่อนรายละเอียด
-                with st.expander("🚨 WARNING: แนวรับแตก! (กดเพื่อดูรายละเอียด)", expanded=False):
+                # 🔥 ใช้ Expander ซ่อนรายละเอียด + หัวข้อตัวหนาพิเศษ
+                with st.expander("**🚨 WARNING: แนวรับแตก! (กดเพื่อดูรายละเอียด)**", expanded=False):
                     st.markdown(f"""
                     <div style="background-color: #fef2f2; border: 1px solid #fca5a5; padding: 15px; border-radius: 10px;">
                         <div style="color: #7f1d1d; margin-bottom: 10px;">
@@ -880,8 +892,8 @@ if st.session_state['search_triggered']:
                 else:
                     target_txt = "🚀 <b>เป้าถัดไป:</b> ทะลุทุกแนวต้าน! (Blue Sky Breakout) ถือ Run Trend ให้สุด"
 
-                # 🔥 ใช้ Expander ซ่อนรายละเอียด
-                with st.expander("🚀 ALERT: เบรคแนวต้านแล้ว! (กดเพื่อดูรายละเอียด)", expanded=False):
+                # 🔥 ใช้ Expander ซ่อนรายละเอียด + หัวข้อตัวหนาพิเศษ
+                with st.expander("**🚀 ALERT: เบรคแนวต้านแล้ว! (กดเพื่อดูรายละเอียด)**", expanded=False):
                     st.markdown(f"""
                     <div style="background-color: #f0fdf4; border: 1px solid #86efac; padding: 15px; border-radius: 10px;">
                         <div style="color: #14532d; margin-bottom: 10px;">
