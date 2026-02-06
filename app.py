@@ -837,7 +837,7 @@ if st.session_state['search_triggered']:
             final_show_supp = []
             for item in merged_supp:
                 if (price - item['val']) / price > 0.30 and "EMA 200 (TF Week" not in item['label']: continue
-                is_vip = "EMA 200" in item['label'] or "EMA 50 (TF Week" in item['label'] or "52-Week" in item['label'] or "Confluence" in item['label']
+                is_vip = "EMA 200" in item['label'] or "EMA 50 (TF Week" in item['label'] or "Confluence" in item['label']
                 if not final_show_supp: final_show_supp.append(item)
                 else:
                     last_item = final_show_supp[-1]
@@ -1047,6 +1047,8 @@ if st.session_state['search_triggered']:
         with c_reset:
             if st.button("⚠️ รีเซ็ต Google Sheet", type="secondary"):
                 with st.spinner("กำลังล้างข้อมูลใน Google Sheet..."):
+                    # ต้องมีฟังก์ชัน reset_gsheet ใน Part 1 ถึงจะใช้ปุ่มนี้ได้
+                    # ถ้าไม่มีฟังก์ชันนี้ ให้ลบปุ่มนี้ออก หรือไปเพิ่มฟังก์ชันใน Part 1
                     try:
                         scope = ['https://spreadsheets.google.com/feeds', 'https://www.googleapis.com/auth/drive']
                         if "gcp_service_account" in st.secrets:
