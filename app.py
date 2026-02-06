@@ -932,9 +932,9 @@ if st.session_state['search_triggered']:
             </div>
             """, unsafe_allow_html=True)
             
-            # --- ส่วนแสดงผล: 1. AI Strategy & 2. Execution Plan ---
+            # --- DISPLAY: AI Strategy & Execution Plan (Fixed) ---
             
-            # เตรียมธีมสีสำหรับ AI Strategy (กล่องบน)
+            # 1. Themes
             color_map = {
                 "green": {"bg": "#dcfce7", "border": "#22c55e", "text": "#14532d"}, 
                 "red": {"bg": "#fee2e2", "border": "#ef4444", "text": "#7f1d1d"}, 
@@ -943,7 +943,7 @@ if st.session_state['search_triggered']:
             }
             c_theme = color_map.get(ai_report['status_color'], color_map["yellow"])
 
-            # เตรียม Logic คำแนะนำ (Execution Plan) - ใช้ HTML <b> แทน Markdown **
+            # 2. Logic for Messages
             strat = ai_report['strategy']
             sl_val = ai_report['sl']
             tp_val = ai_report['tp']
@@ -964,7 +964,7 @@ if st.session_state['search_triggered']:
                 adv_holder = f"<span style='color:#854d0e'><b>🟡 ถือรอ:</b></span> ถ้าทุนต่ำถือต่อได้ แต่ถ้าหลุด {sl_str_bold} ต้องหนี"
                 adv_none = f"<span style='color:#854d0e'><b>👀 เฝ้าดู:</b></span> ยังไม่ชัดเจน อย่าเพิ่งเข้าเทรด รอเลือกทางก่อน"
 
-            # --- 📦 กล่องที่ 1: AI STRATEGY (สีตามสถานะ) ---
+            # 3. Render AI Strategy
             st.subheader("🤖 AI STRATEGY (God Mode)")
             st.markdown(f"""
             <div style="background-color: {c_theme['bg']}; border-left: 6px solid {c_theme['border']}; padding: 20px; border-radius: 12px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
@@ -980,10 +980,9 @@ if st.session_state['search_triggered']:
                     <b>💡 Insight:</b> {ai_report['context']}
                 </div>
             </div>
-            """, unsafe_allow_html=True)
+            """, unsafe_allow_html=True) # <--- IMPORTANT: Allow HTML here
 
-            # --- 📦 กล่องที่ 2: EXECUTION PLAN (สีม่วง Lavender - ไม่ซ้ำกับฟ้า) ---
-            # ปรับสีใหม่: พื้นหลัง #faf5ff (ม่วงจาง), ขอบ #9333ea (ม่วงสด), ตัวหนังสือ #581c87 (ม่วงเข้ม)
+            # 4. Render Execution Plan (Lavender Theme)
             st.markdown(f"""
             <div style="background-color: #faf5ff; border: 1px solid #e9d5ff; border-left: 6px solid #9333ea; padding: 20px; border-radius: 12px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
                 <h3 style="color: #6b21a8; margin:0 0 15px 0; font-size: 22px; font-weight: 700;">🎯 แผนการเทรด (Execution Plan)</h3>
@@ -1007,9 +1006,9 @@ if st.session_state['search_triggered']:
                     </div>
                 </div>
             </div>
-            """, unsafe_allow_html=True)
+            """, unsafe_allow_html=True) # <--- IMPORTANT: Allow HTML here
 
-            # --- ส่วนที่ 3: Bullish/Bearish Factors (ย้ายลงมาล่างสุด) ---
+            # 5. Bullish/Bearish Factors (Bottom)
             with st.chat_message("assistant"):
                 if ai_report['bullish_factors']: 
                     st.markdown("**🟢 ปัจจัยบวก (Bullish Factors):**")
@@ -1048,8 +1047,6 @@ if st.session_state['search_triggered']:
         with c_reset:
             if st.button("⚠️ รีเซ็ต Google Sheet", type="secondary"):
                 with st.spinner("กำลังล้างข้อมูลใน Google Sheet..."):
-                    # ต้องมีฟังก์ชัน reset_gsheet ใน Part 1 ถึงจะใช้ปุ่มนี้ได้
-                    # ถ้าไม่มีฟังก์ชันนี้ ให้ลบปุ่มนี้ออก หรือไปเพิ่มฟังก์ชันใน Part 1
                     try:
                         scope = ['https://spreadsheets.google.com/feeds', 'https://www.googleapis.com/auth/drive']
                         if "gcp_service_account" in st.secrets:
