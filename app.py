@@ -791,9 +791,185 @@ if st.session_state['search_triggered']:
             elif tf_code == "1wk": min_dist = atr * 2.0 
             else: min_dist = atr * 1.5 
 
-            st.subheader("🚧 Key Levels")
+            # --- 🔥 NEW: KEY LEVELS & ANALYSIS CENTER (Alert + Forecast) ---
+            st.subheader("🚧 Key Levels & Analysis")
+
+            # ----------------------------------------------------
+            # 1. 🔍 LOGIC: ตรวจสอบการหลุดแนวรับ (Breakdown Check)
+            # ----------------------------------------------------
+            breakdown_list = []
+            if not np.isnan(ema50) and price < ema50: breakdown_list.append(f"EMA 50 ({ema50:.2f})")
+            if not np.isnan(ema200) and price < ema200: breakdown_list.append(f"EMA 200 ({ema200:.2f})")
+            if demand_zones:
+                sorted_zones = sorted(demand_zones, key=lambda x: x['top'], reverse=True)
+                for z in sorted_zones:
+                    if price < z['bottom']: 
+                        breakdown_list.append(f"Demand Zone [{z['bottom']:.2f}-{z['top']:.2f}]")
+                        break 
+
+            # หา Next Support (Magnet)
+            candidates_supp_check = []
+            if not np.isnan(ema50) and ema50 < price: candidates_supp_check.append({'val': ema50, 'label': "EMA 50"})
+            if not np.isnan(ema200) and ema200 < price: candidates_supp_check.append({'val': ema200, 'label': "EMA 200"})
+            if demand_zones:
+                for z in demand_zones:
+                    if z['top'] < price: candidates_supp_check.append({'val': z['top'], 'label': f"Zone {z['top']:.2f}"})
+            if not df_stats_week.empty: 
+                 try: w_ema200 = ta.ema(df_stats_week['Close'], length=200).iloc[-1]
+                 except: w_ema200 = np.nan
+                 if not np.isnan(w_ema200) and w_ema200 < price: candidates_supp_check.append({'val': w_ema200, 'label': "EMA 200 Week"})
+
+            next_support_val = 0
+            next_support_desc = ""
+            if candidates_supp_check:
+                best_supp = max(candidates_supp_check, key=lambda x: x['val']) 
+                next_support_val = best_supp['val']
+                next_support_desc = best_supp['label']
+
+            # ----------------------------------------------------
+            # 2. 🚀 LOGIC: ตรวจสอบการเบรคแนวต้าน (Breakout Check)
+            # ----------------------------------------------------
+            breakout_list = []
+            if not np.isnan(ema50) and price > ema50 and (price - ema50)/ema50 < 0.05: breakout_list.append(f"EMA 50 ({ema50:.2f})")
+            if not np.isnan(ema200) and price > ema200 and (price - ema200)/ema200 < 0.05: breakout_list.append(f"EMA 200 ({ema200:.2f})")
             
-            # --- SUPPORTS ---
+            # หา Next Resistance (Sky Target)
+            candidates_res_check = []
+            if not np.isnan(ema50) and ema50 > price: candidates_res_check.append({'val': ema50, 'label': "EMA 50"})
+            if not np.isnan(ema200) and ema200 > price: candidates_res_check.append({'val': ema200, 'label': "EMA 200"})
+            if not np.isnan(bb_upper) and bb_upper > price: candidates_res_check.append({'val': bb_upper, 'label': "BB Upper"})
+            if supply_zones:
+                for z in supply_zones:
+                    if z['bottom'] > price: candidates_res_check.append({'val': z['bottom'], 'label': f"Supply Zone"})
+
+            next_res_val = 0
+            next_res_desc = ""
+            if candidates_res_check:
+                best_res = min(candidates_res_check, key=lambda x: x['val']) # เอาค่าที่ใกล้ราคาที่สุด (น้อยที่สุดที่ยังมากกว่าราคา)
+                next_res_val = best_res['val']
+                next_res_desc = best_res['label']
+
+            # ----------------------------------------------------
+            # 3. 🚦 DISPLAY ALERTS (แสดงผลแจ้งเตือน)
+            # ----------------------------------------------------
+
+            # A. 🚨 CASE BREAKDOWN (หลุดแนวรับ)
+            if breakdown_list:
+                broken_txt = ", ".join(breakdown_list)
+                if next_support_val > 0:
+                    downside_risk = ((price - next_support_val) / price) * 100
+                    prediction_txt = f"📉 <b>คาดการณ์:</b> มีโอกาสไหลลงทดสอบแนวรับถัดไปที่ <b>{next_support_val:.2f} ({next_support_desc})</b> (Downside {downside_risk:.2f}%)"
+                else:
+                    prediction_txt = "🌑 <b>คาดการณ์:</b> หลุดทุกแนวรับสำคัญ! (Blue Sky Down) ระวังการลงไม่มีก้นเหว"
+
+                st.markdown(f"""
+                <div style="background-color: #fef2f2; border: 1px solid #fca5a5; padding: 15px; border-radius: 10px; margin-bottom: 20px;">
+                    <div style="color: #991b1b; font-weight: bold; font-size: 16px; margin-bottom: 5px;">
+                        🚨 WARNING: แนวรับแตก! (Support Broken)
+                    </div>
+                    <div style="color: #7f1d1d; margin-bottom: 10px;">
+                        ❌ ราคาได้หลุด: <b>{broken_txt}</b> ลงมาแล้ว
+                    </div>
+                    <div style="color: #b91c1c; font-style: italic;">
+                        {prediction_txt}
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
+
+            # B. 🚀 CASE BREAKOUT (ทะลุแนวต้าน) - NEW!
+            elif breakout_list: 
+                break_txt = ", ".join(breakout_list)
+                if next_res_val > 0:
+                    upside_gain = ((next_res_val - price) / price) * 100
+                    target_txt = f"🎯 <b>เป้าถัดไป:</b> ลุ้นทดสอบ <b>{next_res_val:.2f} ({next_res_desc})</b> (Upside +{upside_gain:.2f}%)"
+                else:
+                    target_txt = "🚀 <b>เป้าถัดไป:</b> ทะลุทุกแนวต้าน! (Blue Sky Breakout) ถือ Run Trend ให้สุด"
+
+                st.markdown(f"""
+                <div style="background-color: #f0fdf4; border: 1px solid #86efac; padding: 15px; border-radius: 10px; margin-bottom: 20px;">
+                    <div style="color: #166534; font-weight: bold; font-size: 16px; margin-bottom: 5px;">
+                        🚀 ALERT: เบรคแนวต้านแล้ว! (Resistance Broken)
+                    </div>
+                    <div style="color: #14532d; margin-bottom: 10px;">
+                        ✅ ราคาทะลุผ่าน: <b>{break_txt}</b> ขึ้นมาได้อย่างสวยงาม
+                    </div>
+                    <div style="color: #15803d; font-style: italic;">
+                        {target_txt}
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
+
+            # C. 🛡️ CASE TESTING SUPPORT (กำลังทดสอบแนวรับ - ยังไม่หลุด)
+            elif next_support_val > 0 and (price - next_support_val) / price < 0.02:
+                # Scoring Logic
+                def_score = 0
+                reasons = []
+                if rsi <= 30: def_score += 2; reasons.append("RSI Oversold")
+                elif rsi >= 50: def_score -= 1; reasons.append("RSI ยังลงได้อีก")
+                if "Bullish Divergence" in str(ai_report['bullish_factors']): def_score += 3; reasons.append("Bullish Div")
+                elif "ทิ้งของ" in ai_report['obv_insight']: def_score -= 2; reasons.append("เจ้ามือทิ้งของ")
+                if "สูงมาก" in vol_status: def_score -= 3; reasons.append("Panic Sell")
+                elif "ต่ำ" in vol_status: def_score += 1; reasons.append("Volume แห้ง")
+                if "Week" in next_support_desc: def_score += 2; reasons.append("Major Support")
+
+                if def_score >= 2:
+                    health_msg = f"🛡️ <b>ประเมิน: กำแพงเหล็ก (Strong)</b> ({', '.join(reasons)})"
+                    h_bg = "#dcfce7"; h_border = "#22c55e"; h_text = "#14532d"
+                elif def_score <= -2:
+                    health_msg = f"⚠️ <b>ประเมิน: เสี่ยงหลุดสูง (Weak)</b> ({', '.join(reasons)})"
+                    h_bg = "#fee2e2"; h_border = "#ef4444"; h_text = "#7f1d1d"
+                else:
+                    health_msg = "⚖️ <b>ประเมิน: ปกติ (รอแท่งเทียนกลับตัว)</b>"
+                    h_bg = "#fef9c3"; h_border = "#eab308"; h_text = "#713f12"
+
+                st.markdown(f"""
+                <div style="background-color: {h_bg}; border: 1px solid {h_border}; padding: 15px; border-radius: 10px; margin-bottom: 20px;">
+                    <div style="color: {h_text}; font-weight: bold; font-size: 16px; margin-bottom: 5px;">
+                        🔮 Support Health Check (ตรวจสุขภาพแนวรับ)
+                    </div>
+                    <div style="color: {h_text};">
+                        กำลังทดสอบแนวรับ: <b>{next_support_val:.2f} ({next_support_desc})</b>
+                    </div>
+                    <div style="margin-top:5px; color: {h_text}; font-style: italic;">
+                        {health_msg}
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
+
+            # D. 🧗 CASE TESTING RESISTANCE (กำลังทดสอบแนวต้าน - ยังไม่ผ่าน) - NEW!
+            elif next_res_val > 0 and (next_res_val - price) / price < 0.02:
+                # Breakout Scoring Logic
+                atk_score = 0
+                reasons = []
+                if rsi >= 60 and rsi <= 75: atk_score += 2; reasons.append("Momentum กำลังมา")
+                elif rsi > 80: atk_score -= 1; reasons.append("Overbought ตึงๆ")
+                if "สูง" in vol_status: atk_score += 2; reasons.append("Volume สนับสนุน")
+                elif "ต่ำ" in vol_status: atk_score -= 2; reasons.append("Volume ไม่พอ")
+                if "Three White Soldiers" in ai_report['candle_pattern']: atk_score += 3; reasons.append("แท่งเทียน Bullish จ่อเบรค")
+
+                if atk_score >= 2:
+                    break_msg = f"🚀 <b>ประเมิน: มีลุ้นเบรคสูง (High Chance)</b> ({', '.join(reasons)})"
+                    b_bg = "#dcfce7"; b_border = "#22c55e"; b_text = "#14532d"
+                else:
+                    break_msg = f"🧱 <b>ประเมิน: กำแพงหนา (Likely Reject)</b> ({', '.join(reasons)})"
+                    b_bg = "#fff7ed"; b_border = "#f97316"; b_text = "#7c2d12"
+
+                st.markdown(f"""
+                <div style="background-color: {b_bg}; border: 1px solid {b_border}; padding: 15px; border-radius: 10px; margin-bottom: 20px;">
+                    <div style="color: {b_text}; font-weight: bold; font-size: 16px; margin-bottom: 5px;">
+                        🔮 Resistance Health Check (ตรวจสุขภาพแนวต้าน)
+                    </div>
+                    <div style="color: {b_text};">
+                        กำลังทดสอบแนวต้าน: <b>{next_res_val:.2f} ({next_res_desc})</b>
+                    </div>
+                    <div style="margin-top:5px; color: {b_text}; font-style: italic;">
+                        {break_msg}
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
+
+
+            # --- SUPPORTS (List แนวรับ - ไม่เอาตัวซ้ำ) ---
             candidates_supp = []
             if not np.isnan(ema20) and ema20 < price: candidates_supp.append({'val': ema20, 'label': f"EMA 20 ({tf_label} - ระยะสั้น)"})
             if not np.isnan(ema50) and ema50 < price: candidates_supp.append({'val': ema50, 'label': f"EMA 50 ({tf_label})"})
@@ -805,18 +981,20 @@ if st.session_state['search_triggered']:
                 except: d_ema50 = np.nan
                 try: d_ema200 = ta.ema(df_stats_day['Close'], length=200).iloc[-1]
                 except: d_ema200 = np.nan
-                if not np.isnan(d_ema50) and d_ema50 < price: candidates_supp.append({'val': d_ema50, 'label': "EMA 50 (TF Day - รับระยะกลาง)"})
-                if not np.isnan(d_ema200) and d_ema200 < price: candidates_supp.append({'val': d_ema200, 'label': "🛡️ EMA 200 (TF Day - รับใหญ่รายวัน)"})
+                # 🔥 FIX: ถ้าเล่น TF Day ไม่เอา Day มาโชว์ซ้ำ
+                if tf_code != "1d": 
+                    if not np.isnan(d_ema50) and d_ema50 < price: candidates_supp.append({'val': d_ema50, 'label': "EMA 50 (TF Day - รับระยะกลาง)"})
+                    if not np.isnan(d_ema200) and d_ema200 < price: candidates_supp.append({'val': d_ema200, 'label': "🛡️ EMA 200 (TF Day - รับใหญ่รายวัน)"})
             
             if not df_stats_week.empty:
                 try: w_ema50 = ta.ema(df_stats_week['Close'], length=50).iloc[-1]
                 except: w_ema50 = np.nan
                 try: w_ema200 = ta.ema(df_stats_week['Close'], length=200).iloc[-1]
                 except: w_ema200 = np.nan
-                
-                # 🔥 FIX: เปลี่ยนคำว่า "ต้าน" เป็น "รับ" ในส่วน Support
-                if not np.isnan(w_ema50) and w_ema50 < price: candidates_supp.append({'val': w_ema50, 'label': "EMA 50 (TF Week - รับระยะยาว)"})
-                if not np.isnan(w_ema200) and w_ema200 < price: candidates_supp.append({'val': w_ema200, 'label': "🛡️ EMA 200 (TF Week - รับระดับกองทุน)"})
+                # 🔥 FIX: ถ้าเล่น TF Week ไม่เอา Week มาโชว์ซ้ำ
+                if tf_code != "1wk":
+                    if not np.isnan(w_ema50) and w_ema50 < price: candidates_supp.append({'val': w_ema50, 'label': "EMA 50 (TF Week - รับระยะยาว)"})
+                    if not np.isnan(w_ema200) and w_ema200 < price: candidates_supp.append({'val': w_ema200, 'label': "🛡️ EMA 200 (TF Week - รับระดับกองทุน)"})
 
             if demand_zones:
                 for z in demand_zones: candidates_supp.append({'val': z['bottom'], 'label': f"Demand Zone [{z['bottom']:.2f}-{z['top']:.2f}]"})
@@ -847,12 +1025,12 @@ if st.session_state['search_triggered']:
                     if is_vip or dist >= min_dist:
                          final_show_supp.append(item)
 
-            st.markdown("#### 🟢 แนวรับ"); 
+            st.markdown("#### 🟢 แนวรับ (Supports)"); 
             if final_show_supp: 
                 for item in final_show_supp[:4]: st.write(f"- **{item['val']:.2f} :** {item['label']}")
             else: st.error("🚨 ราคาหลุดทุกแนวรับสำคัญ! (All Time Low?)")
 
-            # --- RESISTANCES ---
+            # --- RESISTANCES (เหมือนเดิม) ---
             candidates_res = []
             if not np.isnan(ema20) and ema20 > price: candidates_res.append({'val': ema20, 'label': f"EMA 20 ({tf_label} - ต้านสั้น)"})
             if not np.isnan(ema50) and ema50 > price: candidates_res.append({'val': ema50, 'label': f"EMA 50 ({tf_label})"})
@@ -862,7 +1040,11 @@ if st.session_state['search_triggered']:
             if not df_stats_day.empty:
                 try: d_ema50 = ta.ema(df_stats_day['Close'], length=50).iloc[-1]
                 except: d_ema50 = np.nan
-                if not np.isnan(d_ema50) and d_ema50 > price: candidates_res.append({'val': d_ema50, 'label': "EMA 50 (TF Day)"})
+                
+                # 🔥 FIX: ถ้าเล่น TF Day อยู่แล้ว ไม่ต้องเอา Day มาโชว์ซ้ำ
+                if tf_code != "1d":
+                    if not np.isnan(d_ema50) and d_ema50 > price: candidates_res.append({'val': d_ema50, 'label': "EMA 50 (TF Day)"})
+                
                 try: high_60d = df_stats_day['High'].tail(60).max()
                 except: high_60d = np.nan
                 if not np.isnan(high_60d) and high_60d > price: candidates_res.append({'val': high_60d, 'label': "🏔️ High 60d (ดอย 3 เดือน)"})
@@ -873,9 +1055,10 @@ if st.session_state['search_triggered']:
                 try: w_ema200 = ta.ema(df_stats_week['Close'], length=200).iloc[-1]
                 except: w_ema200 = np.nan
                 
-                # 🔥 FIX: ตรวจสอบคำว่า "ต้าน" ในส่วน Resistance
-                if not np.isnan(w_ema50) and w_ema50 > price: candidates_res.append({'val': w_ema50, 'label': "EMA 50 (TF Week - ต้านระยะยาว)"})
-                if not np.isnan(w_ema200) and w_ema200 > price: candidates_res.append({'val': w_ema200, 'label': "🛡️ EMA 200 (TF Week - ต้านระดับกองทุน)"})
+                # 🔥 FIX: ถ้าเล่น TF Week อยู่แล้ว ไม่ต้องเอา Week มาโชว์ซ้ำ
+                if tf_code != "1wk":
+                    if not np.isnan(w_ema50) and w_ema50 > price: candidates_res.append({'val': w_ema50, 'label': "EMA 50 (TF Week - ต้านระยะยาว)"})
+                    if not np.isnan(w_ema200) and w_ema200 > price: candidates_res.append({'val': w_ema200, 'label': "🛡️ EMA 200 (TF Week - ต้านระดับกองทุน)"})
                 
             if supply_zones:
                 for z in supply_zones: candidates_res.append({'val': z['top'], 'label': f"Supply Zone [{z['bottom']:.2f}-{z['top']:.2f}]"})
@@ -907,7 +1090,7 @@ if st.session_state['search_triggered']:
                     if is_vip or dist >= min_dist:
                         final_show_res.append(item)
 
-            st.markdown("#### 🔴 แนวต้าน"); 
+            st.markdown("#### 🔴 แนวต้าน (Resistances)"); 
             if final_show_res: 
                 for item in final_show_res[:4]: st.write(f"- **{item['val']:.2f} :** {item['label']}")
             else: st.write("- N/A (Blue Sky)")
@@ -1091,5 +1274,4 @@ if st.session_state['search_triggered']:
 
     else: 
         st.error("ไม่พบข้อมูลหุ้น หรือข้อมูลไม่เพียงพอสำหรับคำนวณ (ต้องมีมากกว่า 20 แท่ง)")
-
 
