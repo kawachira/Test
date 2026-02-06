@@ -813,8 +813,8 @@ if st.session_state['search_triggered']:
                 except: w_ema50 = np.nan
                 try: w_ema200 = ta.ema(df_stats_week['Close'], length=200).iloc[-1]
                 except: w_ema200 = np.nan
-                if not np.isnan(w_ema50) and w_ema50 < price: candidates_supp.append({'val': w_ema50, 'label': "EMA 50 (TF Week - รับระยะยาว)"})
-                if not np.isnan(w_ema200) and w_ema200 < price: candidates_supp.append({'val': w_ema200, 'label': "🛡️ EMA 200 (TF Week - รับระดับกองทุน)"})
+                if not np.isnan(w_ema50) and w_ema50 < price: candidates_supp.append({'val': w_ema50, 'label': "EMA 50 (TF Week - ต้านระยะยาว)"})
+                if not np.isnan(w_ema200) and w_ema200 < price: candidates_supp.append({'val': w_ema200, 'label': "🛡️ EMA 200 (TF Week - ต้านระดับกองทุน)"})
 
             if demand_zones:
                 for z in demand_zones: candidates_supp.append({'val': z['bottom'], 'label': f"Demand Zone [{z['bottom']:.2f}-{z['top']:.2f}]"})
@@ -837,7 +837,7 @@ if st.session_state['search_triggered']:
             final_show_supp = []
             for item in merged_supp:
                 if (price - item['val']) / price > 0.30 and "EMA 200 (TF Week" not in item['label']: continue
-                is_vip = "EMA 200" in item['label'] or "EMA 50 (TF Week" in item['label'] or "Confluence" in item['label']
+                is_vip = "EMA 200" in item['label'] or "EMA 50 (TF Week" in item['label'] or "52-Week" in item['label'] or "Confluence" in item['label']
                 if not final_show_supp: final_show_supp.append(item)
                 else:
                     last_item = final_show_supp[-1]
@@ -932,9 +932,8 @@ if st.session_state['search_triggered']:
             </div>
             """, unsafe_allow_html=True)
             
-            # --- DISPLAY: AI Strategy & Execution Plan (Fixed) ---
+            # --- DISPLAY: AI Strategy & Execution Plan (Fixed Variable Method) ---
             
-            # 1. Themes
             color_map = {
                 "green": {"bg": "#dcfce7", "border": "#22c55e", "text": "#14532d"}, 
                 "red": {"bg": "#fee2e2", "border": "#ef4444", "text": "#7f1d1d"}, 
@@ -943,7 +942,7 @@ if st.session_state['search_triggered']:
             }
             c_theme = color_map.get(ai_report['status_color'], color_map["yellow"])
 
-            # 2. Logic for Messages
+            # Logic Calculation
             strat = ai_report['strategy']
             sl_val = ai_report['sl']
             tp_val = ai_report['tp']
@@ -964,9 +963,10 @@ if st.session_state['search_triggered']:
                 adv_holder = f"<span style='color:#854d0e'><b>🟡 ถือรอ:</b></span> ถ้าทุนต่ำถือต่อได้ แต่ถ้าหลุด {sl_str_bold} ต้องหนี"
                 adv_none = f"<span style='color:#854d0e'><b>👀 เฝ้าดู:</b></span> ยังไม่ชัดเจน อย่าเพิ่งเข้าเทรด รอเลือกทางก่อน"
 
-            # 3. Render AI Strategy
-            st.subheader("🤖 AI STRATEGY (God Mode)")
-            st.markdown(f"""
+            # --- Construct HTML Strings (Variable Method) ---
+            
+            # 1. AI Strategy HTML
+            html_strategy = f"""
             <div style="background-color: {c_theme['bg']}; border-left: 6px solid {c_theme['border']}; padding: 20px; border-radius: 12px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
                 <h2 style="color: {c_theme['text']}; margin:0 0 10px 0; font-size: 26px; font-weight: 800;">{ai_report['banner_title']}</h2>
                 <div style="font-size: 20px; font-weight: 700; color: {c_theme['text']}; margin-bottom: 5px;">
@@ -980,20 +980,17 @@ if st.session_state['search_triggered']:
                     <b>💡 Insight:</b> {ai_report['context']}
                 </div>
             </div>
-            """, unsafe_allow_html=True) # <--- IMPORTANT: Allow HTML here
+            """
 
-            # 4. Render Execution Plan (Lavender Theme)
-            st.markdown(f"""
+            # 2. Execution Plan HTML (Lavender Theme)
+            html_plan = f"""
             <div style="background-color: #faf5ff; border: 1px solid #e9d5ff; border-left: 6px solid #9333ea; padding: 20px; border-radius: 12px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
                 <h3 style="color: #6b21a8; margin:0 0 15px 0; font-size: 22px; font-weight: 700;">🎯 แผนการเทรด (Execution Plan)</h3>
-                
                 <div style="margin-bottom: 15px; font-size: 17px; color: #581c87; line-height: 1.6;">
                     <div style="margin-bottom: 10px;">🎒 <b>สำหรับคนมีของ:</b><br>{adv_holder}</div>
                     <div>🛒 <b>สำหรับคนไม่มีของ:</b><br>{adv_none}</div>
                 </div>
-                
                 <hr style="border-top: 1px solid #9333ea; opacity: 0.3; margin: 15px 0;">
-                
                 <div style="font-size: 17px; color: #581c87;">
                     <b>🧱 Setup (กรอบราคา):</b><br>
                     <div style="margin-top:8px; display:flex; gap:15px; flex-wrap:wrap;">
@@ -1006,9 +1003,14 @@ if st.session_state['search_triggered']:
                     </div>
                 </div>
             </div>
-            """, unsafe_allow_html=True) # <--- IMPORTANT: Allow HTML here
+            """
 
-            # 5. Bullish/Bearish Factors (Bottom)
+            # --- Render Markdown ---
+            st.subheader("🤖 AI STRATEGY (God Mode)")
+            st.markdown(html_strategy, unsafe_allow_html=True)
+            st.markdown(html_plan, unsafe_allow_html=True)
+
+            # --- Bullish/Bearish Factors (Bottom) ---
             with st.chat_message("assistant"):
                 if ai_report['bullish_factors']: 
                     st.markdown("**🟢 ปัจจัยบวก (Bullish Factors):**")
@@ -1087,4 +1089,7 @@ if st.session_state['search_triggered']:
 
     else: 
         st.error("ไม่พบข้อมูลหุ้น หรือข้อมูลไม่เพียงพอสำหรับคำนวณ (ต้องมีมากกว่า 20 แท่ง)")
+
+
+
 
