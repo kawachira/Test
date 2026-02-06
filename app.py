@@ -724,11 +724,7 @@ if st.session_state['search_triggered']:
         st.markdown(f"<h2 style='text-align: center; margin-top: -15px; margin-bottom: 25px;'>{icon_html} {info['longName']} ({symbol_input})</h2>", unsafe_allow_html=True)
 
         m_state = info.get('marketState', '').upper()
-        if m_state == "REGULAR": st_msg = "🟢 **Market Open:** Real-time Analysis"; st_bg = "#dcfce7"; st_color = "#166534"
-        elif m_state in ["PRE", "PREPRE"]: st_msg = "🟠 **Pre-Market:** Pending Open"; st_bg = "#ffedd5"; st_color = "#9a3412"
-        elif m_state in ["POST", "POSTPOST"]: st_msg = "🌙 **Post-Market:** Closed"; st_bg = "#e0e7ff"; st_color = "#3730a3"
-        else: st_msg = "🔴 **Market Closed**"; st_bg = "#fee2e2"; st_color = "#991b1b"
-        st.markdown(f"""<div style="text-align: center; margin-bottom: 20px;"><div style="background-color: {st_bg}; color: {st_color}; padding: 8px 20px; border-radius: 30px; font-size: 0.95rem; font-weight: 600; display: inline-block;">{st_msg}</div></div>""", unsafe_allow_html=True)
+        # [REMOVED] ลบแถบสถานะ Market Open/Closed ออกตามคำสั่ง (แต่ยังเก็บตัวแปร m_state ไว้ใช้กับ OHLC)
 
         c1, c2 = st.columns(2)
         with c1:
@@ -850,10 +846,10 @@ if st.session_state['search_triggered']:
                 next_res_desc = best_res['label']
 
             # ----------------------------------------------------
-            # 3. 🚦 DISPLAY ALERTS (แสดงผลแจ้งเตือน)
+            # 3. 🚦 DISPLAY ALERTS (แสดงผลแจ้งเตือน - Expander)
             # ----------------------------------------------------
 
-            # A. 🚨 CASE BREAKDOWN (หลุดแนวรับ)
+            # A. 🚨 CASE BREAKDOWN (หลุดแนวรับ - Expander)
             if breakdown_list:
                 broken_txt = ", ".join(breakdown_list)
                 if next_support_val > 0:
@@ -862,21 +858,20 @@ if st.session_state['search_triggered']:
                 else:
                     prediction_txt = "🌑 <b>คาดการณ์:</b> หลุดทุกแนวรับสำคัญ! (Blue Sky Down) ระวังการลงไม่มีก้นเหว"
 
-                st.markdown(f"""
-                <div style="background-color: #fef2f2; border: 1px solid #fca5a5; padding: 15px; border-radius: 10px; margin-bottom: 20px;">
-                    <div style="color: #991b1b; font-weight: bold; font-size: 16px; margin-bottom: 5px;">
-                        🚨 WARNING: แนวรับแตก! (Support Broken)
+                # 🔥 ใช้ Expander ซ่อนรายละเอียด
+                with st.expander("🚨 WARNING: แนวรับแตก! (กดเพื่อดูรายละเอียด)", expanded=False):
+                    st.markdown(f"""
+                    <div style="background-color: #fef2f2; border: 1px solid #fca5a5; padding: 15px; border-radius: 10px;">
+                        <div style="color: #7f1d1d; margin-bottom: 10px;">
+                            ❌ ราคาได้หลุด: <b>{broken_txt}</b> ลงมาแล้ว
+                        </div>
+                        <div style="color: #b91c1c; font-style: italic;">
+                            {prediction_txt}
+                        </div>
                     </div>
-                    <div style="color: #7f1d1d; margin-bottom: 10px;">
-                        ❌ ราคาได้หลุด: <b>{broken_txt}</b> ลงมาแล้ว
-                    </div>
-                    <div style="color: #b91c1c; font-style: italic;">
-                        {prediction_txt}
-                    </div>
-                </div>
-                """, unsafe_allow_html=True)
+                    """, unsafe_allow_html=True)
 
-            # B. 🚀 CASE BREAKOUT (ทะลุแนวต้าน) - NEW!
+            # B. 🚀 CASE BREAKOUT (ทะลุแนวต้าน - Expander)
             elif breakout_list: 
                 break_txt = ", ".join(breakout_list)
                 if next_res_val > 0:
@@ -885,19 +880,18 @@ if st.session_state['search_triggered']:
                 else:
                     target_txt = "🚀 <b>เป้าถัดไป:</b> ทะลุทุกแนวต้าน! (Blue Sky Breakout) ถือ Run Trend ให้สุด"
 
-                st.markdown(f"""
-                <div style="background-color: #f0fdf4; border: 1px solid #86efac; padding: 15px; border-radius: 10px; margin-bottom: 20px;">
-                    <div style="color: #166534; font-weight: bold; font-size: 16px; margin-bottom: 5px;">
-                        🚀 ALERT: เบรคแนวต้านแล้ว! (Resistance Broken)
+                # 🔥 ใช้ Expander ซ่อนรายละเอียด
+                with st.expander("🚀 ALERT: เบรคแนวต้านแล้ว! (กดเพื่อดูรายละเอียด)", expanded=False):
+                    st.markdown(f"""
+                    <div style="background-color: #f0fdf4; border: 1px solid #86efac; padding: 15px; border-radius: 10px;">
+                        <div style="color: #14532d; margin-bottom: 10px;">
+                            ✅ ราคาทะลุผ่าน: <b>{break_txt}</b> ขึ้นมาได้อย่างสวยงาม
+                        </div>
+                        <div style="color: #15803d; font-style: italic;">
+                            {target_txt}
+                        </div>
                     </div>
-                    <div style="color: #14532d; margin-bottom: 10px;">
-                        ✅ ราคาทะลุผ่าน: <b>{break_txt}</b> ขึ้นมาได้อย่างสวยงาม
-                    </div>
-                    <div style="color: #15803d; font-style: italic;">
-                        {target_txt}
-                    </div>
-                </div>
-                """, unsafe_allow_html=True)
+                    """, unsafe_allow_html=True)
 
             # C. 🛡️ CASE TESTING SUPPORT (กำลังทดสอบแนวรับ - ยังไม่หลุด)
             elif next_support_val > 0 and (price - next_support_val) / price < 0.02:
@@ -936,7 +930,7 @@ if st.session_state['search_triggered']:
                 </div>
                 """, unsafe_allow_html=True)
 
-            # D. 🧗 CASE TESTING RESISTANCE (กำลังทดสอบแนวต้าน - ยังไม่ผ่าน) - NEW!
+            # D. 🧗 CASE TESTING RESISTANCE (กำลังทดสอบแนวต้าน - ยังไม่ผ่าน)
             elif next_res_val > 0 and (next_res_val - price) / price < 0.02:
                 # Breakout Scoring Logic
                 atk_score = 0
@@ -1234,23 +1228,8 @@ if st.session_state['search_triggered']:
             st.subheader("📜 History Log (บันทึกการวิเคราะห์)")
             
         with c_reset:
-            if st.button("⚠️ รีเซ็ต Google Sheet", type="secondary"):
-                with st.spinner("กำลังล้างข้อมูลใน Google Sheet..."):
-                    try:
-                        scope = ['https://spreadsheets.google.com/feeds', 'https://www.googleapis.com/auth/drive']
-                        if "gcp_service_account" in st.secrets:
-                            creds_dict = dict(st.secrets["gcp_service_account"])
-                            creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
-                            client = gspread.authorize(creds)
-                            sheet = client.open("Stock_Analysis_Log").sheet1
-                            sheet.resize(rows=1)
-                            sheet.resize(rows=1000)
-                            st.toast("ล้างข้อมูลเรียบร้อยแล้ว!", icon="🧹")
-                            st.session_state['history_log'] = [] 
-                            time.sleep(1)
-                            st.rerun()
-                    except:
-                        st.error("เกิดข้อผิดพลาด หรือยังไม่ได้ตั้งค่า Google Sheet")
+            # [REMOVED] ปุ่มรีเซ็ตถูกลบออกแล้วตามคำสั่ง
+            pass
 
         if st.session_state['history_log']: 
             df_hist = pd.DataFrame(st.session_state['history_log'])
