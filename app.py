@@ -584,7 +584,7 @@ if st.session_state['search_triggered']:
             df_stats_day = pd.DataFrame(); df_stats_week = pd.DataFrame()
 
     if df is not None and not df.empty and len(df) > 20: 
-        # --- Indicator Calculation (เหมือนเดิม) ---
+        # --- Indicator Calculation ---
         df['EMA20'] = ta.ema(df['Close'], length=20)
         df['EMA50'] = ta.ema(df['Close'], length=50)
         
@@ -679,14 +679,11 @@ if st.session_state['search_triggered']:
                                        is_squeeze,
                                        df_candles_4)
 
-        # --- LOG MANAGEMENT (แปลภาษา + เพิ่มช่อง) ---
+        # --- LOG MANAGEMENT ---
         current_time = datetime.now().strftime("%H:%M:%S")
-        
-        # 1. ดึง % Change
         pct_change = info.get('regularMarketChangePercent', 0)
         pct_str = f"{pct_change * 100:+.2f}%" if pct_change is not None else "0.00%"
 
-        # 2. แปลง Action เป็นภาษาไทย
         raw_strat = ai_report['strategy']
         if "Aggressive Buy" in raw_strat: th_action = "ลุยซื้อ (Aggressive)"
         elif "Buy on Dip" in raw_strat: th_action = "ย่อซื้อ (Dip)"
@@ -698,7 +695,6 @@ if st.session_state['search_triggered']:
         elif "Sell" in raw_strat: th_action = "เด้งขาย"
         else: th_action = raw_strat 
 
-        # 3. แปลง Score เป็นภาษาไทย
         raw_color = ai_report['status_color']
         if raw_color == "green": th_score = "🟢 ขาขึ้น"
         elif raw_color == "red": th_score = "🔴 ขาลง"
@@ -936,7 +932,9 @@ if st.session_state['search_triggered']:
             </div>
             """, unsafe_allow_html=True)
             
-            st.subheader("🤖 AI STRATEGY (God Mode)")
+            # --- ส่วนแสดงผล: 1. AI Strategy & 2. Execution Plan ---
+            
+            # เตรียมธีมสีสำหรับ AI Strategy (กล่องบน)
             color_map = {
                 "green": {"bg": "#dcfce7", "border": "#22c55e", "text": "#14532d"}, 
                 "red": {"bg": "#fee2e2", "border": "#ef4444", "text": "#7f1d1d"}, 
@@ -944,61 +942,69 @@ if st.session_state['search_triggered']:
                 "yellow": {"bg": "#fef9c3", "border": "#eab308", "text": "#713f12"}
             }
             c_theme = color_map.get(ai_report['status_color'], color_map["yellow"])
-            
-            # --- ส่วนที่ 1: AI Strategy Banner ---
+
+            # เตรียม Logic คำแนะนำ (Execution Plan) - ใช้ HTML <b> แทน Markdown **
+            strat = ai_report['strategy']
+            sl_val = ai_report['sl']
+            tp_val = ai_report['tp']
+            sl_str_bold = f"<b>{sl_val:.2f}</b>"
+
+            if price < ema20:
+                entry_txt = f"บริเวณนี้ ({price:.2f}) หรือแนวรับ"
+            else:
+                entry_txt = f"ย่อตัวลงมาใกล้ {ema20:.2f}"
+
+            if "Buy" in strat or "Accumulate" in strat:
+                adv_holder = f"<span style='color:#15803d'><b>🟢 ถือรันเทรนด์:</b></span> ยก Stop Loss ตามขึ้นไป (ระวังหลุด {sl_str_bold}) อย่าเพิ่งรีบขายหมู"
+                adv_none = f"<span style='color:#15803d'><b>🛒 หาจังหวะเข้า:</b></span> {entry_txt} โดยห้ามหลุด {sl_str_bold}"
+            elif "Sell" in strat or "Exit" in strat or "Reduce" in strat:
+                adv_holder = f"<span style='color:#b91c1c'><b>🔴 ลดพอร์ต/หนี:</b></span> สถานการณ์ไม่ดี ถ้าหลุด {sl_str_bold} ต้องเลิก"
+                adv_none = f"<span style='color:#b91c1c'><b>✋ ห้ามรับมีด:</b></span> ราคากำลังลงแรง อย่าเพิ่งสวน รอฐานชัดเจน"
+            else:
+                adv_holder = f"<span style='color:#854d0e'><b>🟡 ถือรอ:</b></span> ถ้าทุนต่ำถือต่อได้ แต่ถ้าหลุด {sl_str_bold} ต้องหนี"
+                adv_none = f"<span style='color:#854d0e'><b>👀 เฝ้าดู:</b></span> ยังไม่ชัดเจน อย่าเพิ่งเข้าเทรด รอเลือกทางก่อน"
+
+            # --- 📦 กล่องที่ 1: AI STRATEGY (สีตามสถานะ) ---
+            st.subheader("🤖 AI STRATEGY (God Mode)")
             st.markdown(f"""
-            <div style="background-color: {c_theme['bg']}; border-left: 6px solid {c_theme['border']}; padding: 20px; border-radius: 10px; margin-bottom: 20px;">
-                <h2 style="color: {c_theme['text']}; margin:0 0 10px 0; font-size: 28px;">{ai_report['banner_title']}</h2>
-                <div style="font-size: 20px; font-weight: bold; color: {c_theme['text']}; margin-bottom: 5px;">
+            <div style="background-color: {c_theme['bg']}; border-left: 6px solid {c_theme['border']}; padding: 20px; border-radius: 12px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
+                <h2 style="color: {c_theme['text']}; margin:0 0 10px 0; font-size: 26px; font-weight: 800;">{ai_report['banner_title']}</h2>
+                <div style="font-size: 20px; font-weight: 700; color: {c_theme['text']}; margin-bottom: 5px;">
                     {ai_report['strategy']}
                 </div>
-                <div style="font-size: 18px; color: {c_theme['text']}; margin-bottom: 15px; line-height: 1.5;">
+                <div style="font-size: 18px; color: {c_theme['text']}; margin-bottom: 15px; line-height: 1.6;">
                     👉 {ai_report['holder_advice']}
                 </div>
-                <hr style="border-top: 1px solid {c_theme['text']}; opacity: 0.2; margin: 10px 0;">
-                <div style="font-size: 16px; color: {c_theme['text']}; opacity: 0.9;">
+                <hr style="border-top: 1px solid {c_theme['text']}; opacity: 0.3; margin: 12px 0;">
+                <div style="font-size: 16px; color: {c_theme['text']}; opacity: 0.95;">
                     <b>💡 Insight:</b> {ai_report['context']}
                 </div>
             </div>
             """, unsafe_allow_html=True)
-            
-            # --- คำนวณ Logic แผนการเทรดก่อนแสดงผล ---
-            strat = ai_report['strategy']
-            sl_val = ai_report['sl']
-            tp_val = ai_report['tp']
-            sl_str_bold = f"**{sl_val:.2f}**"
 
-            if price < ema20:
-                entry_txt = f"บริเวณนี้ (`{price:.2f}`) หรือแนวรับ"
-            else:
-                entry_txt = f"ย่อตัวลงมาใกล้ `{ema20:.2f}`"
-
-            if "Buy" in strat or "Accumulate" in strat:
-                adv_holder = f"🟢 **ถือรันเทรนด์:** ยก Stop Loss ตามขึ้นไป (ระวังหลุด {sl_str_bold}) อย่าเพิ่งรีบขายหมู"
-                adv_none = f"🛒 **หาจังหวะเข้า:** {entry_txt} โดยห้ามหลุด `{sl_val:.2f}`"
-            elif "Sell" in strat or "Exit" in strat or "Reduce" in strat:
-                adv_holder = f"🔴 **ลดพอร์ต/หนี:** สถานการณ์ไม่ดี ถ้าหลุด {sl_str_bold} ต้องเลิก"
-                adv_none = "✋ **ห้ามรับมีด:** ราคากำลังลงแรง อย่าเพิ่งสวน รอฐานชัดเจน"
-            else:
-                adv_holder = f"🟡 **ถือรอ:** ถ้าทุนต่ำถือต่อได้ แต่ถ้าหลุด {sl_str_bold} ต้องหนี"
-                adv_none = "👀 **เฝ้าดู:** ยังไม่ชัดเจน อย่าเพิ่งเข้าเทรด รอเลือกทางก่อน"
-
-            # --- ส่วนที่ 2: Execution Plan (ย้ายขึ้นมา & ปรับดีไซน์ให้สมส่วน) ---
+            # --- 📦 กล่องที่ 2: EXECUTION PLAN (สีม่วง Lavender - ไม่ซ้ำกับฟ้า) ---
+            # ปรับสีใหม่: พื้นหลัง #faf5ff (ม่วงจาง), ขอบ #9333ea (ม่วงสด), ตัวหนังสือ #581c87 (ม่วงเข้ม)
             st.markdown(f"""
-            <div style="background-color: {c_theme['bg']}; border-left: 6px solid {c_theme['border']}; padding: 20px; border-radius: 10px; margin-bottom: 20px;">
-                <h3 style="color: {c_theme['text']}; margin:0 0 15px 0; font-size: 22px;">🎯 แผนการเทรด (Execution Plan)</h3>
+            <div style="background-color: #faf5ff; border: 1px solid #e9d5ff; border-left: 6px solid #9333ea; padding: 20px; border-radius: 12px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
+                <h3 style="color: #6b21a8; margin:0 0 15px 0; font-size: 22px; font-weight: 700;">🎯 แผนการเทรด (Execution Plan)</h3>
                 
-                <div style="margin-bottom: 15px; font-size: 16px; color: {c_theme['text']};">
-                    <div style="margin-bottom: 8px;">🎒 <b>สำหรับคนมีของ:</b><br>{adv_holder}</div>
+                <div style="margin-bottom: 15px; font-size: 17px; color: #581c87; line-height: 1.6;">
+                    <div style="margin-bottom: 10px;">🎒 <b>สำหรับคนมีของ:</b><br>{adv_holder}</div>
                     <div>🛒 <b>สำหรับคนไม่มีของ:</b><br>{adv_none}</div>
                 </div>
                 
-                <hr style="border-top: 1px solid {c_theme['text']}; opacity: 0.2; margin: 15px 0;">
+                <hr style="border-top: 1px solid #9333ea; opacity: 0.3; margin: 15px 0;">
                 
-                <div style="font-size: 16px; color: {c_theme['text']};">
+                <div style="font-size: 17px; color: #581c87;">
                     <b>🧱 Setup (กรอบราคา):</b><br>
-                    <span style="display:inline-block; margin-top:5px;">🛑 <b>SL :</b> <b>{sl_val:.2f}</b> (จุดหนี)</span><br>
-                    <span style="display:inline-block; margin-top:5px;">✅ <b>TP :</b> <b>{tp_val:.2f}</b> (จุดทำกำไร)</span>
+                    <div style="margin-top:8px; display:flex; gap:15px; flex-wrap:wrap;">
+                        <span style="background:#fee2e2; color:#991b1b; padding:4px 12px; border-radius:6px; font-weight:bold; border:1px solid #fecaca;">
+                            🛑 SL : {sl_val:.2f}
+                        </span>
+                        <span style="background:#dcfce7; color:#166534; padding:4px 12px; border-radius:6px; font-weight:bold; border:1px solid #bbf7d0;">
+                            ✅ TP : {tp_val:.2f}
+                        </span>
+                    </div>
                 </div>
             </div>
             """, unsafe_allow_html=True)
@@ -1082,5 +1088,4 @@ if st.session_state['search_triggered']:
 
     else: 
         st.error("ไม่พบข้อมูลหุ้น หรือข้อมูลไม่เพียงพอสำหรับคำนวณ (ต้องมีมากกว่า 20 แท่ง)")
-
 
