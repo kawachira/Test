@@ -566,7 +566,7 @@ if st.session_state['search_triggered']:
     
     st.divider()
     
-    # CSS สำหรับปรับแต่งส่วนแสดงผล (คืนค่าขนาด Font เดิม)
+    # CSS สำหรับปรับแต่งส่วนแสดงผล (คืนค่าขนาด Font เดิม - ใหญ่ชัดเจน)
     st.markdown("""
     <style>
     body { overflow: auto !important; }
@@ -753,10 +753,10 @@ if st.session_state['search_triggered']:
             else: reg_pct = 0.0
             color_text = "#16a34a" if reg_chg and reg_chg > 0 else "#dc2626"; bg_color = "#e8f5ec" if reg_chg and reg_chg > 0 else "#fee2e2"
             
-            # Price Display (คืนค่าขนาดใหญ่: 40px/20px/18px)
+            # Price Display (ขนาดใหญ่ 40px)
             st.markdown(f"""<div style="margin-bottom:5px; display: flex; align-items: center; gap: 15px; flex-wrap: wrap;"><div style="font-size:40px; font-weight:600; line-height: 1;">{reg_price:,.2f} <span style="font-size: 20px; color: #6b7280; font-weight: 400;">USD</span></div><div style="display:inline-flex; align-items:center; gap:6px; background:{bg_color}; color:{color_text}; padding:4px 12px; border-radius:999px; font-size:18px; font-weight:500;">{arrow_html(reg_chg)} {reg_chg:+.2f} ({reg_pct:.2f}%)</div></div>""", unsafe_allow_html=True)
             
-            # เตรียม HTML สำหรับ P/E และ EPS
+            # P/E & EPS HTML (เตรียมไว้ใส่ด้านล่าง)
             pe = info.get('trailingPE')
             eps = info.get('trailingEps')
             pe_str = f"{pe:.2f}" if pe and pe > 0 else "N/A"
@@ -779,7 +779,7 @@ if st.session_state['search_triggered']:
             if info.get('preMarketPrice') and info.get('preMarketChange'): p = info.get('preMarketPrice'); c = info.get('preMarketChange'); prev_p = p - c; pct = (c / prev_p) * 100 if prev_p != 0 else 0; pre_post_html += f'<div style="margin-bottom: 6px; font-size: 12px;">☀️ Pre: <b>{p:.2f}</b> {make_pill(c, pct)}</div>'
             if info.get('postMarketPrice') and info.get('postMarketChange'): p = info.get('postMarketPrice'); c = info.get('postMarketChange'); prev_p = p - c; pct = (c / prev_p) * 100 if prev_p != 0 else 0; pre_post_html += f'<div style="margin-bottom: 6px; font-size: 12px;">🌙 Post: <b>{p:.2f}</b> {make_pill(c, pct)}</div>'
             
-            # 🔥 แสดงผลรวมกัน: OHLC/Pre-Post ขึ้นก่อน แล้วตามด้วย P/E EPS ล่างสุด
+            # 🔥 รวม HTML: เอา P/E & EPS มาต่อท้ายสุด
             combined_html = f'<div style="margin-top: -5px; margin-bottom: 15px;">{ohlc_html}{pre_post_html}{pe_eps_html}</div>'
             st.markdown(combined_html, unsafe_allow_html=True)
 
@@ -789,7 +789,7 @@ if st.session_state['search_triggered']:
         st_color = ai_report["status_color"]
         main_status = ai_report["banner_title"]
         
-        # ปรับระยะห่างให้ชิดขึ้น (ลบ \n ออกหนึ่งตัว)
+        # ปรับระยะห่างให้ชิดขึ้น
         msg_content = f"{main_status}\n**{tf_label}**"
         
         if st_color == "green": c2.success(f"📈 {msg_content}")
@@ -801,7 +801,6 @@ if st.session_state['search_triggered']:
         icon_flat_svg = """<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="#a3a3a3"><circle cx="12" cy="12" r="10"/></svg>"""
         with c3:
             rsi_str = f"{rsi:.2f}" if not np.isnan(rsi) else "N/A"; rsi_text = get_rsi_interpretation(rsi, adx_val > 25)
-            # Custom Metric ใช้ Font ใหญ่ตาม Function ใน Part 1
             st.markdown(custom_metric_html("⚡ RSI (14)", rsi_str, rsi_text, "gray", icon_flat_svg), unsafe_allow_html=True)
         with c4:
             adx_disp = float(adx_val) if not np.isnan(adx_val) else np.nan
@@ -816,21 +815,20 @@ if st.session_state['search_triggered']:
         
         st.write("") 
         c_ema, c_ai = st.columns([1.5, 2])
-                with c_ema:
+        with c_ema:
             st.subheader("📉 Technical Indicators")
             vol_str = format_volume(vol_now)
             e20_s = f"{ema20:.2f}" if not np.isnan(ema20) else "N/A"
             e50_s = f"{ema50:.2f}" if not np.isnan(ema50) else "N/A"
             e200_s = f"{ema200:.2f}" if (ema200 is not None and not np.isnan(ema200)) else "N/A"
             
-            # --- เพิ่มส่วนนี้: จัด Format MACD ---
+            # 🔥 เพิ่ม MACD String
             macd_s = f"{macd_val:.2f} / {macd_signal:.2f}" if not np.isnan(macd_val) else "N/A"
-            # ----------------------------------
 
             atr_pct = (atr / price) * 100 if not np.isnan(atr) and price > 0 else 0; atr_s = f"{atr:.2f} ({atr_pct:.1f}%)" if not np.isnan(atr) else "N/A"
             bb_s = f"{bb_upper:.2f} / {bb_lower:.2f}" if not np.isnan(bb_upper) else "N/A"
 
-            # ตาราง Indicator (แทรกบรรทัด MACD ลงไปต่อจาก EMA 200)
+            # 🔥 เพิ่มบรรทัด MACD ใน HTML Table
             st.markdown(f"""
             <div style='background-color: var(--secondary-background-color); padding: 15px; border-radius: 10px; font-size: 0.95rem;'>
                 <div style='display:flex; justify-content:space-between; margin-bottom:5px; border-bottom:1px solid #ddd; font-weight:bold;'><span>Indicator</span> <span>Value</span></div>
@@ -845,7 +843,7 @@ if st.session_state['search_triggered']:
             
             if tf_code == "1h": min_dist = atr * 1.0 
             elif tf_code == "1wk": min_dist = atr * 2.0 
-            else: min_dist = atr * 1.5  
+            else: min_dist = atr * 1.5 
 
             # --- KEY LEVELS & ANALYSIS CENTER (Alert + Forecast) ---
             st.subheader("🚧 Key Levels & Analysis")
