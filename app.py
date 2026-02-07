@@ -789,13 +789,24 @@ if st.session_state['search_triggered']:
         st_color = ai_report["status_color"]
         main_status = ai_report["banner_title"]
         
-        # ปรับระยะห่างให้ชิดขึ้น
-        msg_content = f"{main_status}\n**{tf_label}**"
-        
-        if st_color == "green": c2.success(f"📈 {msg_content}")
-        elif st_color == "red": c2.error(f"📉 {msg_content}")
-        elif st_color == "orange": c2.warning(f"⚠️ {msg_content}")
-        else: c2.warning(f"⚖️ {msg_content}")
+        # --- 🔥 BANNER STYLE (แยกบรรทัด + ลบวงเล็บ + ตัวหนาใหญ่) ---
+        if st_color == "green": 
+            s_bg = "#dcfce7"; s_col = "#166534"
+        elif st_color == "red": 
+            s_bg = "#fee2e2"; s_col = "#991b1b"
+        elif st_color == "orange": 
+            s_bg = "#ffedd5"; s_col = "#9a3412"
+        else: 
+            s_bg = "#fef9c3"; s_col = "#854d0e"
+
+        # HTML Banner (แยก 2 div, ไม่มี icon)
+        c2.markdown(f"""
+        <div style="background-color: {s_bg}; color: {s_col}; padding: 12px 15px; border-radius: 8px; border: 1px solid {s_bg};">
+            <div style="font-weight: 800; font-size: 1.3rem; line-height: 1.2; margin-bottom: 5px;">{main_status}</div>
+            <div style="font-size: 1rem; font-weight: 600; opacity: 0.9;">{tf_label}</div>
+        </div>
+        """, unsafe_allow_html=True)
+        # ------------------------------------------------------------
 
         c3, c4 = st.columns(2)
         icon_flat_svg = """<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="#a3a3a3"><circle cx="12" cy="12" r="10"/></svg>"""
