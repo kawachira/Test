@@ -23,25 +23,27 @@ if 'search_triggered' not in st.session_state:
 if 'last_symbol' not in st.session_state:
     st.session_state['last_symbol'] = ""
 
-# --- 2. CSS ปรับแต่ง (New Color Zones Design) ---
+# --- 2. CSS ปรับแต่ง (เพิ่ม Class กรอบสี 4 โซน) ---
 st.markdown("""
     <style>
-    body { overflow-x: hidden; font-family: 'Sarabun', sans-serif; }
+    body { overflow-x: hidden; }
     .block-container { padding-top: 1rem !important; padding-bottom: 5rem !important; }
+    
+    /* คืนค่า Font หัวข้อให้ใหญ่เหมือนเดิม (2.8rem) */
     h1 { text-align: center; font-size: 2.8rem !important; margin-bottom: 0px !important; margin-top: 5px !important; }
     
-    /* Search Form */
     div[data-testid="stForm"] {
         border: none; padding: 30px; border-radius: 20px;
         background-color: var(--secondary-background-color);
         box-shadow: 0 8px 24px rgba(0,0,0,0.12);
         max-width: 800px; margin: 0 auto;
     }
+    
+    /* คืนค่า Font ปุ่มกดให้ใหญ่เหมือนเดิม (1.2rem) */
     div[data-testid="stFormSubmitButton"] button {
         width: 100%; border-radius: 12px; font-size: 1.2rem; font-weight: bold; padding: 15px 0;
     }
-
-    /* Disclaimer */
+    
     .disclaimer-box {
         margin-top: 20px; margin-bottom: 20px; padding: 20px;
         background-color: #fff8e1; border: 2px solid #ffc107;
@@ -49,32 +51,30 @@ st.markdown("""
         text-align: center; font-weight: 500;
         box-shadow: 0 4px 6px rgba(0,0,0,0.05);
     }
-
-    /* --- 🎨 NEW 4 ZONES DESIGN (Flexible Height + Shadow) --- */
     
-    /* Zone 1: ฟ้าขาวอ่อนๆ (Header, Price, Fundamentals) */
+    /* --- 🎨 NEW 4 ZONES DESIGN (เพิ่มใหม่) --- */
+    
+    /* Zone 1: ฟ้าขาวอ่อนๆ (Header, Price) */
     .zone-box-1 {
         background-color: #f0f9ff; /* Sky 50 */
         border: 2px solid #bae6fd; /* Sky 200 */
         border-radius: 15px;
         padding: 20px;
         margin-bottom: 25px;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+        box-shadow: 0 4px 10px rgba(0,0,0,0.08);
         color: #333;
     }
-    .zone-box-1 h3, .zone-box-1 h2 { color: #0369a1; } 
 
-    /* Zone 2: ม่วงอ่อนๆ (Technical Indicators) */
+    /* Zone 2: ม่วงอ่อนๆ (Technical) */
     .zone-box-2 {
         background-color: #f5f3ff; /* Violet 50 */
         border: 2px solid #ddd6fe; /* Violet 200 */
         border-radius: 15px;
         padding: 20px;
         margin-bottom: 25px;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+        box-shadow: 0 4px 10px rgba(0,0,0,0.08);
         color: #333;
     }
-    .zone-box-2 h3 { color: #7c3aed; } 
 
     /* Zone 3: ส้มเหลืองอ่อนๆ (Key Levels) */
     .zone-box-3 {
@@ -83,10 +83,9 @@ st.markdown("""
         border-radius: 15px;
         padding: 20px;
         margin-bottom: 25px;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+        box-shadow: 0 4px 10px rgba(0,0,0,0.08);
         color: #333;
     }
-    .zone-box-3 h3 { color: #b45309; } 
 
     /* Zone 4: แดงชมพูอ่อนๆ (Factors) */
     .zone-box-4 {
@@ -95,26 +94,53 @@ st.markdown("""
         border-radius: 15px;
         padding: 20px;
         margin-bottom: 25px;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+        box-shadow: 0 4px 10px rgba(0,0,0,0.08);
         color: #333;
     }
-    .zone-box-4 h3 { color: #be123c; } 
 
-    /* --- Utilities --- */
-    /* Price Pill (กรอบราคาเขียว/แดง) */
-    .price-pill-green { background: #dcfce7; color: #166534; padding: 4px 12px; border-radius: 20px; font-weight: 700; border: 1px solid #bbf7d0; display: inline-block; }
-    .price-pill-red { background: #fee2e2; color: #991b1b; padding: 4px 12px; border-radius: 20px; font-weight: 700; border: 1px solid #fecaca; display: inline-block; }
-    
-    /* Expander styling fix */
-    div[data-testid="stExpander"] details summary p {
-        font-size: 1.1rem !important; font-weight: 700 !important; color: #333 !important;
-    }
-    
-    /* X-Ray Style (Updated to match theme) */
+    /* X-Ray Box Style (เดิม) */
     .xray-box {
-        background-color: white; border: 1px solid #e5e7eb; border-radius: 10px; padding: 15px; margin-bottom: 10px;
+        background-color: #ffffff;
+        border: 1px solid #e5e7eb;
+        border-radius: 10px;
+        padding: 15px;
+        margin-bottom: 20px;
     }
-    .xray-item { display: flex; justify-content: space-between; margin-bottom: 8px; font-size: 0.95rem; }
+    .xray-title {
+        font-weight: bold;
+        color: #0369a1;
+        font-size: 1.1rem;
+        margin-bottom: 10px;
+        border-bottom: 1px solid #e0f2fe;
+        padding-bottom: 5px;
+    }
+    .xray-item {
+        display: flex;
+        justify-content: space-between;
+        margin-bottom: 8px;
+        font-size: 0.95rem;
+    }
+    
+    /* Utilities */
+    .metric-box {
+        background: rgba(255,255,255,0.7);
+        padding: 5px 12px;
+        border-radius: 8px;
+        border: 1px solid rgba(0,0,0,0.1);
+        font-size: 1rem;
+        color: #495057;
+        font-weight: 600;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        margin-top: 5px;
+    }
+    /* บังคับฟอนต์หัวข้อ Expander */
+    div[data-testid="stExpander"] details summary p {
+        font-size: 18px !important;
+        font-weight: 700 !important;
+        color: #333333 !important;
+    }
     </style>
     """, unsafe_allow_html=True)
 
@@ -141,55 +167,93 @@ with col_form:
 # --- 4. Helper Functions (Visuals & Data) ---
 
 def analyze_candlestick(df_window):
-    """ฟังก์ชันอ่านแท่งเทียน Pro Max (4-Bar Logic)"""
+    """
+    ฟังก์ชันอ่านแท่งเทียน Pro Max (4-Bar Logic)
+    รับค่า: DataFrame ย้อนหลัง 4 แท่ง (Index 0=ไกลสุด, 3=ล่าสุด)
+    """
+    # 1. กัน Error: ถ้าข้อมูลส่งมาไม่ครบ 4 แท่ง ให้ตอบค่ากลางๆ
     if len(df_window) < 4: 
         return "Normal Candle", "gray", "ข้อมูลไม่เพียงพอ", False
 
-    c1 = df_window.iloc[0]; c2 = df_window.iloc[1]; c3 = df_window.iloc[2]; c4 = df_window.iloc[3]
-    open_p = c4['Open']; close_p = c4['Close']; high_p = c4['High']; low_p = c4['Low']
-    body = abs(close_p - open_p); range_len = high_p - low_p
+    # 2. แยกชิ้นส่วน 4 วัน (เพื่อให้เขียน Logic ง่าย)
+    c1 = df_window.iloc[0] # 3 วันก่อน
+    c2 = df_window.iloc[1] # 2 วันก่อน
+    c3 = df_window.iloc[2] # เมื่อวาน (Prev)
+    c4 = df_window.iloc[3] # วันนี้ (Current)
+
+    # ดึงค่าตัวเลขวันนี้
+    open_p = c4['Open']; close_p = c4['Close']
+    high_p = c4['High']; low_p = c4['Low']
+    body = abs(close_p - open_p)
+    range_len = high_p - low_p
     is_bull = close_p >= open_p
     color = "🟢 เขียว (Buying)" if is_bull else "🔴 แดง (Selling)"
+
+    # ดึงค่าตัวเลขเมื่อวาน
     prev_open = c3['Open']; prev_close = c3['Close']
     is_prev_bull = prev_close >= prev_open
 
-    pattern_name = "Normal Candle (ปกติ)"; detail = "แรงซื้อขายสมดุล"; is_big = False
+    pattern_name = "Normal Candle (ปกติ)"
+    detail = "แรงซื้อขายสมดุล"
+    is_big = False
 
-    # Level 1: 3-4 Bars
+    # --- 🧠 LEVEL 1: รูปแบบกลุ่ม 3-4 แท่ง (แม่นยำสูง) ---
+
+    # 1. Three Black Crows (อีกา 3 ตัว - ขาลงรุนแรง)
     if (c2['Close'] < c2['Open']) and (c3['Close'] < c3['Open']) and (c4['Close'] < c4['Open']):
         if (c4['Close'] < c3['Close']) and (c3['Close'] < c2['Close']):
             return "🦅 Three Black Crows (อีกา 3 ตัว)", "🔴 แดง (Selling)", "แรงขายทุบต่อเนื่อง 3 วัน (ระวังลงลึก)", True
+
+    # 2. Three White Soldiers (3 ทหารเสือ - ขาขึ้นรุนแรง)
     if (c2['Close'] > c2['Open']) and (c3['Close'] > c3['Open']) and (c4['Close'] > c4['Open']):
         if (c4['Close'] > c3['Close']) and (c3['Close'] > c2['Close']):
             return "💂 Three White Soldiers (3 ทหารเสือ)", "🟢 เขียว (Buying)", "แรงซื้อดันต่อเนื่อง 3 วัน (แข็งแกร่ง)", True
-    
-    # Morning/Evening Star
-    c2_body = abs(c2['Close'] - c2['Open'])
-    if (c2['Close'] < c2['Open']) and (c2_body > (c2['High']-c2['Low']) * 0.5):
-        if abs(c3['Close'] - c3['Open']) < c2_body * 0.4:
+
+    # 3. Morning Star (กลับตัวขึ้น)
+    c2_body = abs(c2['Close'] - c2['Open']); c2_range = c2['High'] - c2['Low']
+    if (c2['Close'] < c2['Open']) and (c2_body > c2_range * 0.5): # แท่ง 1 แดงยาว
+        if abs(c3['Close'] - c3['Open']) < c2_body * 0.4: # แท่ง 2 ตัวเล็ก (Star)
             midpoint = (c2['Open'] + c2['Close']) / 2
-            if (c4['Close'] > c4['Open']) and (c4['Close'] > midpoint):
+            if (c4['Close'] > c4['Open']) and (c4['Close'] > midpoint): # แท่ง 3 เขียวสวนเกินครึ่ง
                 return "🌅 Morning Star (รุ่งอรุณ)", "🟢 เขียว (Buying)", "กลับตัวขึ้นสวยงาม (Confirm Reversal)", True
-    if (c2['Close'] > c2['Open']) and (c2_body > (c2['High']-c2['Low']) * 0.5):
-        if abs(c3['Close'] - c3['Open']) < c2_body * 0.4:
+
+    # 4. Evening Star (กลับตัวลง)
+    if (c2['Close'] > c2['Open']) and (c2_body > c2_range * 0.5): # แท่ง 1 เขียวยาว
+        if abs(c3['Close'] - c3['Open']) < c2_body * 0.4: # แท่ง 2 ตัวเล็ก
             midpoint = (c2['Open'] + c2['Close']) / 2
-            if (c4['Close'] < c4['Open']) and (c4['Close'] < midpoint):
+            if (c4['Close'] < c4['Open']) and (c4['Close'] < midpoint): # แท่ง 3 แดงสวนลงมา
                 return "🌆 Evening Star (พลบค่ำ)", "🔴 แดง (Selling)", "กลับตัวลงชัดเจน (Confirm Reversal)", True
 
-    # Level 2: 2 Bars
-    if is_prev_bull and not is_bull:
+    # --- 🧠 LEVEL 2: รูปแบบ 2 แท่ง (Engulfing) ---
+    
+    # Bearish Engulfing
+    if is_prev_bull and not is_bull: # เมื่อวานเขียว วันนี้แดง
         if (open_p >= prev_close) and (close_p <= prev_open):
             return "🐻 Bearish Engulfing (กลืนกินขาลง)", "🔴 แดง (Selling)", "แท่งแดงกลบแท่งเขียวเมื่อวาน", True
-    if not is_prev_bull and is_bull:
+
+    # Bullish Engulfing
+    if not is_prev_bull and is_bull: # เมื่อวานแดง วันนี้เขียว
         if (open_p <= prev_close) and (close_p >= prev_open):
             return "🐂 Bullish Engulfing (กลืนกินขาขึ้น)", "🟢 เขียว (Buying)", "แท่งเขียวกลบแท่งแดงเมื่อวาน", True
 
-    # Level 3: 1 Bar
-    wick_up = high_p - max(close_p, open_p); wick_low = min(close_p, open_p) - low_p
-    if wick_low > (body * 2) and wick_up < body: pattern_name = "🔨 Hammer/Pinbar (ค้อน)"; detail = "ปฏิเสธราคาต่ำ (แรงซื้อสวน)"
-    elif wick_up > (body * 2) and wick_low < body: pattern_name = "☄️ Shooting Star (ดาวตก)"; detail = "ปฏิเสธราคาสูง (แรงขายตบ)"
-    elif body > (range_len * 0.6): is_big = True; pattern_name = "Big Bullish (แท่งเขียวตัน)" if is_bull else "Big Bearish (แท่งแดงตัน)"; detail = "แรงซื้อ/ขาย คุมตลาดเบ็ดเสร็จ"
-    elif body < (range_len * 0.1): pattern_name = "Doji (โดจิ)"; detail = "ตลาดลังเล (Indecision)"
+    # --- 🧠 LEVEL 3: รูปแบบแท่งเดียว (Basic) ---
+    
+    wick_up = high_p - max(close_p, open_p)
+    wick_low = min(close_p, open_p) - low_p
+    
+    if wick_low > (body * 2) and wick_up < body:
+        pattern_name = "🔨 Hammer/Pinbar (ค้อน)"
+        detail = "ปฏิเสธราคาต่ำ (แรงซื้อสวน)"
+    elif wick_up > (body * 2) and wick_low < body:
+        pattern_name = "☄️ Shooting Star (ดาวตก)"
+        detail = "ปฏิเสธราคาสูง (แรงขายตบ)"
+    elif body > (range_len * 0.6): 
+        is_big = True
+        pattern_name = "Big Bullish (แท่งเขียวตัน)" if is_bull else "Big Bearish (แท่งแดงตัน)"
+        detail = "แรงซื้อ/ขาย คุมตลาดเบ็ดเสร็จ"
+    elif body < (range_len * 0.1):
+        pattern_name = "Doji (โดจิ)"
+        detail = "ตลาดลังเล (Indecision)"
         
     return pattern_name, color, detail, is_big
 
@@ -206,13 +270,13 @@ def format_volume(vol):
 def custom_metric_html(label, value, status_text, color_status, icon_svg):
     color_code = "#16a34a" if color_status == "green" else "#dc2626" if color_status == "red" else "#a3a3a3"
     html = f"""
-    <div style="margin-bottom: 10px;">
-        <div style="display: flex; align-items: baseline; gap: 10px;">
-            <div style="font-size: 16px; font-weight: 700; opacity: 0.9; color: #444;">{label}</div>
-            <div style="font-size: 20px; font-weight: 800; color: #111;">{value}</div>
+    <div style="margin-bottom: 15px;">
+        <div style="display: flex; align-items: baseline; gap: 10px; margin-bottom: 5px;">
+            <div style="font-size: 18px; font-weight: 700; opacity: 0.9; color: var(--text-color); white-space: nowrap;">{label}</div>
+            <div style="font-size: 24px; font-weight: 700; color: var(--text-color);">{value}</div>
         </div>
-        <div style="display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; color: {color_code};">
-            <div style="min-width: 18px;">{icon_svg}</div>
+        <div style="display: flex; align-items: start; gap: 6px; font-size: 15px; font-weight: 600; color: {color_code}; line-height: 1.4;">
+            <div style="margin-top: 3px; min-width: 24px;">{icon_svg}</div>
             <div>{status_text}</div>
         </div>
     </div>
@@ -225,7 +289,7 @@ def get_rsi_interpretation(rsi, is_trending_mode):
         if rsi >= 75: return "Super Bullish (แรงสุดๆ)"
         elif rsi <= 45: return "Dip Opportunity (ย่อซื้อ)"
         else: return "Trending"
-    else: 
+    else: # Sideways
         if rsi >= 65: return "Overbought (ระวังแรงขาย)"
         elif rsi <= 35: return "Oversold (ระวังเด้งสวน)"
         else: return "Neutral"
@@ -246,14 +310,24 @@ def save_to_gsheet(data_dict):
             creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
             client = gspread.authorize(creds)
             sheet = client.open("Stock_Analysis_Log").sheet1
+            
             row = [
-                datetime.now().strftime("%Y-%m-%d"), data_dict.get("เวลา", ""), data_dict.get("หุ้น", ""),
-                data_dict.get("TF", ""), data_dict.get("ราคา", ""), data_dict.get("Change%", ""),
-                data_dict.get("สถานะ", ""), data_dict.get("Action", ""), data_dict.get("SL", ""), data_dict.get("TP", "")
+                datetime.now().strftime("%Y-%m-%d"), 
+                data_dict.get("เวลา", ""),           
+                data_dict.get("หุ้น", ""),           
+                data_dict.get("TF", ""),             
+                data_dict.get("ราคา", ""),           
+                data_dict.get("Change%", ""),        
+                data_dict.get("สถานะ", ""),          
+                data_dict.get("Action", ""),         
+                data_dict.get("SL", ""),             
+                data_dict.get("TP", "")              
             ]
-            sheet.append_row(row); return True
+            sheet.append_row(row)
+            return True
         return False
-    except: return False
+    except Exception as e:
+        return False
 
 # --- SMC: Find Zones ---
 def find_demand_zones(df, atr_multiplier=0.25):
@@ -265,13 +339,16 @@ def find_demand_zones(df, atr_multiplier=0.25):
     current_price = df['Close'].iloc[-1]
     for date in swing_indices:
         if date == df.index[-1] or date == df.index[-2]: continue
-        swing_low_val = df.loc[date, 'Low']; atr_val = df.loc[date, 'ATR'] if 'ATR' in df.columns else (swing_low_val * 0.02)
+        swing_low_val = df.loc[date, 'Low']
+        atr_val = df.loc[date, 'ATR'] if 'ATR' in df.columns else (swing_low_val * 0.02)
         if np.isnan(atr_val): atr_val = swing_low_val * 0.02
-        zone_bottom = swing_low_val; zone_top = swing_low_val + (atr_val * atr_multiplier)
+        zone_bottom = swing_low_val
+        zone_top = swing_low_val + (atr_val * atr_multiplier)
         if (current_price - zone_top) / current_price > 0.20: continue
         future_data = df.loc[date:][1:]
         if future_data.empty: continue
-        if not (future_data['Close'] < zone_bottom).any(): zones.append({'bottom': zone_bottom, 'top': zone_top})
+        if not (future_data['Close'] < zone_bottom).any():
+            zones.append({'bottom': zone_bottom, 'top': zone_top})
     return zones
 
 def find_supply_zones(df, atr_multiplier=0.25):
@@ -283,13 +360,16 @@ def find_supply_zones(df, atr_multiplier=0.25):
     current_price = df['Close'].iloc[-1]
     for date in swing_indices:
         if date == df.index[-1] or date == df.index[-2]: continue
-        swing_high_val = df.loc[date, 'High']; atr_val = df.loc[date, 'ATR'] if 'ATR' in df.columns else (swing_high_val * 0.02)
+        swing_high_val = df.loc[date, 'High']
+        atr_val = df.loc[date, 'ATR'] if 'ATR' in df.columns else (swing_high_val * 0.02)
         if np.isnan(atr_val): atr_val = swing_high_val * 0.02
-        zone_top = swing_high_val; zone_bottom = swing_high_val - (atr_val * atr_multiplier)
+        zone_top = swing_high_val
+        zone_bottom = swing_high_val - (atr_val * atr_multiplier)
         if (zone_bottom - current_price) / current_price > 0.20: continue
         future_data = df.loc[date:][1:]
         if future_data.empty: continue
-        if not (future_data['Close'] > zone_top).any(): zones.append({'bottom': zone_bottom, 'top': zone_top})
+        if not (future_data['Close'] > zone_top).any():
+            zones.append({'bottom': zone_bottom, 'top': zone_top})
     return zones
 
 # --- 5. Data Fetching ---
@@ -301,22 +381,28 @@ def get_data_hybrid(symbol, interval, mtf_interval):
         df = ticker.history(period=period_val, interval=interval)
         df_mtf = ticker.history(period="10y", interval=mtf_interval)
         if not df_mtf.empty: df_mtf['EMA200'] = ta.ema(df_mtf['Close'], length=200)
+        
         try: raw_info = ticker.info 
         except: raw_info = {} 
+
         df_daily = ticker.history(period="5d", interval="1d")
         if not df_daily.empty:
-            price = df_daily['Close'].iloc[-1]; chg = price - df_daily['Close'].iloc[-2] if len(df_daily) >=2 else 0
+            price = df_daily['Close'].iloc[-1]
+            chg = price - df_daily['Close'].iloc[-2] if len(df_daily) >=2 else 0
             pct = (chg / df_daily['Close'].iloc[-2]) if len(df_daily) >=2 else 0
-            d_h = df_daily['High'].iloc[-1]; d_l = df_daily['Low'].iloc[-1]; d_o = df_daily['Open'].iloc[-1]
-        else: price = df['Close'].iloc[-1]; chg = 0; pct = 0; d_h=0; d_l=0; d_o=0
+            d_h, d_l, d_o = df_daily['High'].iloc[-1], df_daily['Low'].iloc[-1], df_daily['Open'].iloc[-1]
+        else:
+            price = df['Close'].iloc[-1]; chg = 0; pct = 0; d_h=0; d_l=0; d_o=0
 
         info_dict = {
-            'longName': raw_info.get('longName', symbol), 'marketState': raw_info.get('marketState', 'REGULAR'), 
-            'regularMarketPrice': price, 'regularMarketChange': chg, 'regularMarketChangePercent': pct, 
-            'dayHigh': d_h, 'dayLow': d_l, 'regularMarketOpen': d_o,
+            'longName': raw_info.get('longName', symbol), 
+            'marketState': raw_info.get('marketState', 'REGULAR'), 
+            'regularMarketPrice': price, 'regularMarketChange': chg,
+            'regularMarketChangePercent': pct, 'dayHigh': d_h, 'dayLow': d_l, 'regularMarketOpen': d_o,
             'preMarketPrice': raw_info.get('preMarketPrice'), 'preMarketChange': raw_info.get('preMarketChange'),
             'postMarketPrice': raw_info.get('postMarketPrice'), 'postMarketChange': raw_info.get('postMarketChange'),
-            'trailingPE': raw_info.get('trailingPE'), 'trailingEps': raw_info.get('trailingEps')
+            'trailingPE': raw_info.get('trailingPE'),
+            'trailingEps': raw_info.get('trailingEps')
         }
         return df, info_dict, df_mtf
     except: return None, None, None
@@ -341,90 +427,161 @@ def ai_hybrid_analysis(price, ema20, ema50, ema200, rsi, macd_val, macd_sig, adx
     price = safe(price); ema20 = safe(ema20); ema50 = safe(ema50); ema200 = safe(ema200)
     atr_val = safe(atr_val); obv_slope = safe(obv_slope); vol_now = safe(vol_now); vol_avg = safe(vol_avg)
 
-    # 1. 🔬 Deep Vision
+    # 1. 🔬 Deep Vision: อ่านแท่งเทียน 4 แท่งแบบละเอียด
     candle_pattern, candle_color, candle_detail, is_big_candle = analyze_candlestick(df_candles)
+    
+    is_reversal_up = any(x in candle_pattern for x in ["Hammer", "Bullish Engulfing", "Morning Star", "Three White Soldiers"])
+    is_reversal_down = any(x in candle_pattern for x in ["Shooting Star", "Bearish Engulfing", "Evening Star", "Three Black Crows"])
+    
     is_shooting_star = "Shooting Star" in candle_pattern
-    is_vol_dry = vol_now < (vol_avg * 0.8) 
-    is_vol_climax = vol_now > (vol_avg * 2.0) 
+
+    # Volume Logic (Smart Check)
+    is_vol_dry = vol_now < (vol_avg * 0.8) # วอลุ่มแห้ง (พักตัวดี)
+    is_vol_climax = vol_now > (vol_avg * 2.0) # วอลุ่มระเบิด (ระวังจบแรลลี่)
     vol_txt, vol_col = analyze_volume({'Volume': vol_now}, vol_avg)
 
-    # 2. 🏗️ Zone Checking
+    # 2. 🏗️ Zone Checking (Buffer 1.5%)
     in_demand_zone = False; active_zone = None; confluence_msg = ""
     if demand_zones:
         for zone in demand_zones:
             if (low <= zone['top'] * 1.015) and (high >= zone['bottom']):
                 in_demand_zone = True; active_zone = zone; break
+    
     is_confluence = False
     if in_demand_zone:
         if not np.isnan(ema200) and abs(active_zone['bottom'] - ema200) / price < 0.02: is_confluence = True; confluence_msg = "Zone + EMA 200"
         elif not np.isnan(ema50) and abs(active_zone['bottom'] - ema50) / price < 0.02: is_confluence = True; confluence_msg = "Zone + EMA 50"
 
-    # 3. 🌊 Regime Filter
+    # 3. 🌊 Regime Filter (ADX & Trend)
     is_strong_trend = adx > 25 if not np.isnan(adx) else False
     is_major_uptrend = price > ema200 if not np.isnan(ema200) else True
 
-    # --- 🧠 CONTEXTUAL SCORING SYSTEM ---
-    score = 0; bullish = []; bearish = []; ctx = ""
+    # --- 🧠 CONTEXTUAL SCORING SYSTEM (God Mode) ---
+    score = 0
+    bullish = []
+    bearish = []
+    ctx = ""
 
-    # A. Structure
+    # A. 🏛️ Structural Score (โครงสร้างพื้นฐาน)
     if not np.isnan(ema200):
         if price > ema200: score += 3; bullish.append("Structure: ยืนเหนือ EMA 200 (ขาขึ้นระยะยาว)")
         else: score -= 3; bearish.append("Structure: หลุด EMA 200 (ขาลงระยะยาว)")
+
     if not np.isnan(ema50):
         if price > ema50: score += 2; bullish.append("Structure: ยืนเหนือ EMA 50 (แกร่งระยะกลาง)")
         else: score -= 1; bearish.append("Structure: หลุด EMA 50 (เสียทรงระยะกลาง)")
 
-    # B. Price Action
-    if "Three Black Crows" in candle_pattern: score -= 3; bearish.append("🦅 Three Black Crows: แรงขายทุบ 3 วันติด (อันตราย)"); ctx = "🩸 Panic Dump: หนีตาย (เจ้ามือทิ้งของ)"
-    elif "Evening Star" in candle_pattern: score -= 2; bearish.append("🌆 Evening Star: กลับตัวลงสมบูรณ์แบบ"); 
+    # B. 🕯️ Price Action Score (ตัดสินใจด้วย 4 แท่ง + บริบท)
+    # --- กลุ่มสัญญาณลบ (Bearish) ---
+    if "Three Black Crows" in candle_pattern:
+        score -= 3 # โดนหนัก
+        bearish.append("🦅 Three Black Crows: แรงขายทุบ 3 วันติด (อันตราย)")
+        ctx = "🩸 Panic Dump: หนีตาย (เจ้ามือทิ้งของ)" # Veto
+
+    elif "Evening Star" in candle_pattern:
+        score -= 2
+        bearish.append("🌆 Evening Star: กลับตัวลงสมบูรณ์แบบ")
+        if score < 2: ctx = "📉 Reversal: สัญญาณกลับตัวลงชัดเจน"
+
     elif "Bearish Engulfing" in candle_pattern:
-        if is_vol_climax: score -= 3; bearish.append("🐻 Bearish Engulfing + Vol Peak (เจ้ามือทิ้งของ)"); ctx = "🩸 Panic Sell: แรงขายมหาศาล"
-        elif is_major_uptrend and is_vol_dry: score += 1; bullish.append("🐂 Bullish Pullback: แท่งแดงวอลุ่มแห้ง (ย่อเพื่อไปต่อ)")
-        else: score -= 2; bearish.append("⚠️ Bearish Engulfing: แรงขายชนะแรงซื้อ")
+        # Contextual Check: วอลุ่มและการย่อตัว
+        if is_vol_climax: 
+            score -= 3 # วอลุ่มพีค = เจ้าทิ้ง
+            bearish.append("🐻 Bearish Engulfing + Vol Peak (เจ้ามือทิ้งของ)")
+            ctx = "🩸 Panic Sell: แรงขายมหาศาล"
+        elif is_major_uptrend and is_vol_dry:
+            score += 1 # พลิกวิกฤตเป็นโอกาส
+            bullish.append("🐂 Bullish Pullback: แท่งแดงวอลุ่มแห้ง (ย่อเพื่อไปต่อ)")
+        else:
+            score -= 2 # ปกติ
+            bearish.append("⚠️ Bearish Engulfing: แรงขายชนะแรงซื้อ")
+
     elif is_shooting_star:
-        if price > bb_up: score -= 2; bearish.append("☄️ Shooting Star: โดนตบที่แนวต้าน BB (Overbought)")
-        else: score -= 1; bearish.append("☄️ Shooting Star: มีแรงขายกดดันข้างบน")
+        if price > bb_up: # ชน Bollinger Band บน
+            score -= 2
+            bearish.append("☄️ Shooting Star: โดนตบที่แนวต้าน BB (Overbought)")
+        else:
+            score -= 1
+            bearish.append("☄️ Shooting Star: มีแรงขายกดดันข้างบน")
 
-    if "Three White Soldiers" in candle_pattern: score += 3; bullish.append("💂 Three White Soldiers: แรงซื้อ 3 วันติด (แข็งแกร่งมาก)")
+    # --- กลุ่มสัญญาณบวก (Bullish) ---
+    if "Three White Soldiers" in candle_pattern:
+        score += 3
+        bullish.append("💂 Three White Soldiers: แรงซื้อ 3 วันติด (แข็งแกร่งมาก)")
+
     elif "Morning Star" in candle_pattern:
-        if in_demand_zone: score += 3; bullish.append("🌅 Morning Star (in Zone): จุดกลับตัวต้นน้ำสวยงาม")
-        else: score += 2; bullish.append("🌅 Morning Star: กลับตัวขึ้นสมบูรณ์")
-    elif "Bullish Engulfing" in candle_pattern:
-        if rsi > 70: score -= 1; bearish.append("⚠️ Bullish Trap: เขียวที่ยอดดอย (RSI Overbought)")
-        elif is_vol_climax: score += 3; bullish.append("🚀 Power Buy: แท่งเขียวกลืนกิน + วอลุ่มระเบิด")
-        else: score += 2; bullish.append("🐂 Bullish Engulfing: แรงซื้อชนะแรงขาย")
+        if in_demand_zone:
+            score += 3 # คูณพิเศษ
+            bullish.append("🌅 Morning Star (in Zone): จุดกลับตัวต้นน้ำสวยงาม")
+        else:
+            score += 2
+            bullish.append("🌅 Morning Star: กลับตัวขึ้นสมบูรณ์")
 
-    # C. Flow
+    elif "Bullish Engulfing" in candle_pattern:
+        # Contextual Check: วอลุ่มและตำแหน่ง
+        if rsi > 70: # ซื้อยอดดอย
+            score -= 1
+            bearish.append("⚠️ Bullish Trap: เขียวที่ยอดดอย (RSI Overbought)")
+        elif is_vol_climax:
+            score += 3
+            bullish.append("🚀 Power Buy: แท่งเขียวกลืนกิน + วอลุ่มระเบิด")
+        else:
+            score += 2
+            bullish.append("🐂 Bullish Engulfing: แรงซื้อชนะแรงขาย")
+
+    # C. 📊 Volume & Flow Analysis (Smart OBV)
     obv_strength_pct = 0
-    if vol_avg > 0 and not np.isnan(obv_slope): obv_strength_pct = (obv_slope / vol_avg) * 100
+    if vol_avg > 0 and not np.isnan(obv_slope):
+        obv_strength_pct = (obv_slope / vol_avg) * 100
+    
     obv_insight = f"Flow ปกติ ({obv_strength_pct:.1f}%)"
-    if obv_strength_pct > 5:
+
+    if obv_strength_pct > 5: # เงินเข้า
         if obv_strength_pct > 60: obv_insight = f"🚀 กวาดซื้อ ({obv_strength_pct:.1f}%)"
         else: obv_insight = f"💎 เก็บของ ({obv_strength_pct:.1f}%)"
-        if price < ema20: score += 2; bullish.append(f"Bullish Divergence: ราคาลงแต่เงินเข้า ({obv_strength_pct:.1f}%)"); obv_insight = "Bullish Div (เก็บของ)"
-        else: score += 1; bullish.append(f"Fund Flow: เงินไหลเข้าต่อเนื่อง")
-    elif obv_strength_pct < -5:
+        
+        # Bullish Divergence Check
+        if price < ema20: # ราคาลงแต่เงินเข้า
+            score += 2
+            bullish.append(f"Bullish Divergence: ราคาลงแต่เงินเข้า ({obv_strength_pct:.1f}%)")
+            obv_insight = "Bullish Div (เก็บของ)"
+        else:
+            score += 1
+            bullish.append(f"Fund Flow: เงินไหลเข้าต่อเนื่อง")
+
+    elif obv_strength_pct < -5: # เงินออก
         if obv_strength_pct < -60: obv_insight = f"🩸 ทิ้งของ ({obv_strength_pct:.1f}%)"
         else: obv_insight = f"💧 รินขาย ({obv_strength_pct:.1f}%)"
-        if price > ema20: score -= 2; bearish.append(f"Bearish Divergence: ราคาขึ้นแต่เงินออก ({obv_strength_pct:.1f}%)"); obv_insight = "Bearish Div (รินขาย)"
-        else: score -= 1; bearish.append(f"Fund Flow: เงินไหลออกต่อเนื่อง")
 
-    # D. Indicators
+        # Bearish Divergence Check
+        if price > ema20: # ราคาขึ้นแต่เงินออก
+            score -= 2
+            bearish.append(f"Bearish Divergence: ราคาขึ้นแต่เงินออก ({obv_strength_pct:.1f}%)")
+            obv_insight = "Bearish Div (รินขาย)"
+        else:
+            score -= 1
+            bearish.append(f"Fund Flow: เงินไหลออกต่อเนื่อง")
+
+    # D. ⚡ Momentum & Indicators (RSI/MACD)
     if not np.isnan(macd_val) and macd_val > macd_sig: score += 1; bullish.append("MACD ตัดขึ้น")
     elif not np.isnan(macd_val): score -= 1
+
+    # RSI Context
     if not np.isnan(rsi):
         if is_strong_trend and is_major_uptrend:
-            if rsi > 75 and not is_vol_climax: score += 1; bullish.append(f"RSI {rsi:.0f}: Super Bullish Trend") 
+            if rsi > 75 and not is_vol_climax: score += 1; bullish.append(f"RSI {rsi:.0f}: Super Bullish Trend") # Run trend
             elif rsi < 45: score += 2; bullish.append(f"RSI {rsi:.0f}: Dip Opportunity (ย่อซื้อ)")
-        else:
+        else: # Sideway
             if rsi > 65: score -= 2; bearish.append(f"RSI {rsi:.0f}: Overbought (ระวังต้าน)")
             elif rsi < 30: score += 2; bullish.append(f"RSI {rsi:.0f}: Oversold (รอเด้ง)")
 
-    # E. Context
-    if in_demand_zone: score += 3; bullish.append("🟢 In Demand Zone (ต้นทุนดี)")
-    if is_confluence: score += 1; bullish.append(f"⭐ {confluence_msg}")
-    if not ctx: ctx = "💎 Sniper Mode (เข้าโซนสวย)" if in_demand_zone else ""
+    # E. 🛡️ Special Context (Veto Rules)
+    if in_demand_zone:
+        score += 3; bullish.append("🟢 In Demand Zone (ต้นทุนดี)")
+        if is_confluence: score += 1; bullish.append(f"⭐ {confluence_msg}")
+        if not ctx: ctx = "💎 Sniper Mode (เข้าโซนสวย)"
 
+    # Final Context Generation
     if ctx == "":
         if score >= 5: ctx = "🚀 Bullish Breakout: โมเมนตัมกระทิงดุ"
         elif score >= 2: ctx = "📈 Uptrend Structure: ย่อตัวเพื่อขึ้นต่อ"
@@ -432,17 +589,34 @@ def ai_hybrid_analysis(price, ema20, ema50, ema200, rsi, macd_val, macd_sig, adx
         elif score <= -1: ctx = "📉 Downtrend Pressure: เด้งเพื่อลง"
         else: ctx = "⚖️ Sideway/Neutral: รอเลือกทาง"
 
-    if score >= 6: color = "green"; title = "🚀 Sniper Entry: จุดซื้อคมกริบ"; strat = "Aggressive Buy"; adv = f"โมเมนตัมแรงจัด Pattern สวย ถือรันเทรนด์ SL: {low-(atr_val*1.0):.2f}"
+    # --- FINAL STATUS ASSIGNMENT ---
+    if score >= 6:
+        color = "green"; title = "🚀 Sniper Entry: จุดซื้อคมกริบ"; strat = "Aggressive Buy"
+        adv = f"โมเมนตัมแรงจัด Pattern สวย ถือรันเทรนด์ SL: {low-(atr_val*1.0):.2f}"
     elif score >= 4:
-        if "Pullback" in ctx or "Dip" in str(bullish): color = "green"; title = "🐂 Bullish Pullback: ย่อเพื่อไปต่อ"; strat = "Buy on Dip"; adv = "ราคาย่อตัวในขาขึ้น วอลุ่มแห้ง/RSI ต่ำ เป็นจังหวะเก็บของที่ดีที่สุด"
-        else: color = "green"; title = "🐂 Strong Buy: ขาขึ้นแข็งแกร่ง"; strat = "Accumulate"; adv = "เทรนด์หลักเป็นขาขึ้น ย่อตัวน่าสนใจ"
+        if "Pullback" in ctx or "Dip" in str(bullish):
+            color = "green"; title = "🐂 Bullish Pullback: ย่อเพื่อไปต่อ"; strat = "Buy on Dip"
+            adv = "ราคาย่อตัวในขาขึ้น วอลุ่มแห้ง/RSI ต่ำ เป็นจังหวะเก็บของที่ดีที่สุด"
+        else:
+            color = "green"; title = "🐂 Strong Buy: ขาขึ้นแข็งแกร่ง"; strat = "Accumulate"
+            adv = "เทรนด์หลักเป็นขาขึ้น ย่อตัวน่าสนใจ"
     elif score >= 1:
-        if "Sideway Up" in ctx: color = "yellow"; title = "⚖️ Sideway Up: สะสมพลัง"; strat = "Accumulate"; adv = "ราคาออกข้างแต่เงินไหลเข้า ดักเก็บที่แนวรับ ลุ้นเบรค"
-        else: color = "yellow"; title = "⚖️ Neutral: รอความชัดเจน"; strat = "Wait & Watch"; adv = "ปัจจัยขัดแย้งกัน (เช่น เทรนด์ดีแต่เจอแท่งเทียนกลับตัว) นั่งทับมือไปก่อน"
+        if "Sideway Up" in ctx:
+            color = "yellow"; title = "⚖️ Sideway Up: สะสมพลัง"; strat = "Accumulate"
+            adv = "ราคาออกข้างแต่เงินไหลเข้า ดักเก็บที่แนวรับ ลุ้นเบรค"
+        else:
+            color = "yellow"; title = "⚖️ Neutral: รอความชัดเจน"; strat = "Wait & Watch"
+            adv = "ปัจจัยขัดแย้งกัน (เช่น เทรนด์ดีแต่เจอแท่งเทียนกลับตัว) นั่งทับมือไปก่อน"
     elif score <= -4:
-        if "Panic" in ctx: color = "red"; title = "💀 Panic Sell: หนีตาย"; strat = "Exit Immediately"; adv = "วงแตก! แรงขายระดับวิกฤต (3 Crows / Vol Peak) ห้ามรับเด็ดขาด"
-        else: color = "red"; title = "🩸 Falling Knife: มีดหล่น"; strat = "Avoid / Cut Loss"; adv = "ราคาดิ่งแรง หลุดแนวรับสำคัญ รอให้หยุดลงและสร้างฐานก่อน"
-    else: color = "orange"; title = "🐻 Bearish Pressure: แรงกดดันสูง"; strat = "Reduce Port"; adv = "แรงขายมากกว่าแรงซื้อ ระวังหลุดแนวรับ ไม่ควรรีบรับจนกว่าจะเห็นสัญญาณกลับตัว"
+        if "Panic" in ctx:
+            color = "red"; title = "💀 Panic Sell: หนีตาย"; strat = "Exit Immediately"
+            adv = "วงแตก! แรงขายระดับวิกฤต (3 Crows / Vol Peak) ห้ามรับเด็ดขาด"
+        else:
+            color = "red"; title = "🩸 Falling Knife: มีดหล่น"; strat = "Avoid / Cut Loss"
+            adv = "ราคาดิ่งแรง หลุดแนวรับสำคัญ รอให้หยุดลงและสร้างฐานก่อน"
+    else: # Score 0 to -3
+        color = "orange"; title = "🐻 Bearish Pressure: แรงกดดันสูง"; strat = "Reduce Port"
+        adv = "แรงขายมากกว่าแรงซื้อ ระวังหลุดแนวรับ ไม่ควรรีบรับจนกว่าจะเห็นสัญญาณกลับตัว"
 
     if in_demand_zone: sl = active_zone['bottom'] - (atr_val*0.5)
     else: sl = price - (2*atr_val) if not np.isnan(atr_val) else price*0.95
@@ -456,7 +630,7 @@ def ai_hybrid_analysis(price, ema20, ema50, ema200, rsi, macd_val, macd_sig, adx
         "in_demand_zone": in_demand_zone, "confluence_msg": confluence_msg,
         "is_squeeze": is_squeeze, "obv_insight": obv_insight
     }
-# --- 8. Main Execution & Display (ส่วนแสดงผลหลัก - Renovated UI) ---
+# --- 8. Main Execution & Display (ส่วนแสดงผลหลัก - Finalized UI) ---
 
 # 1. อัปเดต State เมื่อกดปุ่มค้นหา
 if submit_btn:
@@ -468,6 +642,18 @@ if st.session_state['search_triggered']:
     symbol_input = st.session_state['last_symbol']
     
     st.divider()
+    
+    # CSS เสริมสำหรับการจัด Layout ภายใน (Grid System)
+    st.markdown("""
+    <style>
+    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
+    .grid-4 { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 10px; }
+    .flex-between { display: flex; justify-content: space-between; align-items: center; }
+    /* ปรับแต่ง details/summary ให้สวยงามในกรอบ */
+    details { background: rgba(255,255,255,0.5); border-radius: 8px; padding: 10px; margin-top: 10px; border: 1px solid rgba(0,0,0,0.1); }
+    summary { font-weight: bold; cursor: pointer; outline: none; }
+    </style>
+    """, unsafe_allow_html=True)
     
     with st.spinner(f"AI God Mode กำลังเจาะลึก {symbol_input} (Analyzing 4-Bar Pattern & Context)..."):
         # 1. Main Data
@@ -608,27 +794,21 @@ if st.session_state['search_triggered']:
             if len(st.session_state['history_log']) > 10: st.session_state['history_log'] = st.session_state['history_log'][:10]
 
         # =================================================================================================
-        # 🎨 DISPLAY UI (RENOVATED: 4 COLOR ZONES + NESTED CARDS)
+        # 🎨 DISPLAY UI (RENOVATED: 4 COLOR ZONES WITH HTML DETAILS)
         # =================================================================================================
         
         # --------------------------------------------------------------------------------
         # 1. GROUP 1: BLUE ZONE (Header, Price, Fundamentals, Status)
         # --------------------------------------------------------------------------------
-        
-        # Prepare Data Strings
         reg_price, reg_chg = info.get('regularMarketPrice'), info.get('regularMarketChange')
         if reg_price and reg_chg: prev_c = reg_price - reg_chg; reg_pct = (reg_chg / prev_c) * 100 if prev_c != 0 else 0.0
         else: reg_pct = 0.0
         
-        # Logic: Price Pill Class
         if reg_chg >= 0:
-            price_class = "price-pill-green"
-            arrow_icon = "▲"
+            price_class = "price-pill-green"; arrow_icon = "▲"
         else:
-            price_class = "price-pill-red"
-            arrow_icon = "▼"
+            price_class = "price-pill-red"; arrow_icon = "▼"
 
-        # Logic: Status Pill Style (Nested Card)
         st_color = ai_report["status_color"]
         main_status = ai_report["banner_title"]
         if st_color == "green": 
@@ -648,7 +828,6 @@ if st.session_state['search_triggered']:
         elif tf_code == "1wk": tf_label = "TF Week"
         else: tf_label = "TF Day"
 
-        # Fundamentals Data
         pe = info.get('trailingPE'); eps = info.get('trailingEps')
         pe_str = f"{pe:.2f}" if pe else "N/A"; eps_str = f"{eps:.2f}" if eps else "N/A"
         rsi_str = f"{rsi:.2f}" if not np.isnan(rsi) else "N/A"
@@ -659,7 +838,6 @@ if st.session_state['search_triggered']:
         logo_url = f"https://financialmodelingprep.com/image-stock/{symbol_input}.png"
         fallback_url = "https://cdn-icons-png.flaticon.com/512/720/720453.png"
 
-        # Pre/Post Market HTML
         def make_mini_pill(change, percent): 
             col = "#16a34a" if change >= 0 else "#dc2626"
             bg = "#e8f5ec" if change >= 0 else "#fee2e2"
@@ -671,7 +849,6 @@ if st.session_state['search_triggered']:
             pct_post = (c_post / (p_post - c_post)) * 100 if (p_post - c_post) != 0 else 0
             pre_post_html = f'<div style="font-size:0.9rem; color:#64748b; margin-top:5px;">🌙 Post: <b>{p_post:.2f}</b> {make_mini_pill(c_post, pct_post)}</div>'
 
-        # HTML Structure Box 1
         html_box_1 = f"""
         <div class="zone-box-1">
             <div style="display:flex; justify-content:center; margin-bottom:15px;">
@@ -679,27 +856,23 @@ if st.session_state['search_triggered']:
             </div>
             <div style="text-align:center; font-size:26px; font-weight:800; line-height:1.1; margin-bottom:5px;">{info['longName']}</div>
             <div style="text-align:center; font-size:18px; color:#64748b; font-weight:600; margin-bottom:15px;">({symbol_input})</div>
-            
             <div style="display:flex; justify-content:center; align-items:baseline; gap:10px; margin-bottom:10px;">
                 <div style="font-size:48px; font-weight:800; color:#0f172a; line-height:1;">{reg_price:,.2f} <span style="font-size:18px; color:#64748b; font-weight:500;">USD</span></div>
             </div>
-            
             <div style="display:flex; justify-content:center; margin-bottom:10px;">
                 <div class="{price_class}" style="font-size:1.1rem; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
                     {arrow_icon} {reg_chg:+.2f} ({reg_pct:.2f}%)
                 </div>
             </div>
             <div style="text-align:center; margin-bottom:20px;">{pre_post_html}</div>
-
             <div style="{status_pill_style} padding:15px; border-radius:12px; margin-bottom:20px; text-align:left; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
                 <div style="display:flex; align-items:center; gap:10px; margin-bottom:5px;">
                     <span style="font-size:24px;">{st_icon}</span>
-                    <span style="font-size:18px; font-weight:800;">{main_status}</span>
+                    <span style="font-size:20px; font-weight:800;">{main_status}</span>
                 </div>
                 <div style="font-size:1rem; font-weight:600; opacity:0.8; margin-left:38px;">{tf_label}</div>
             </div>
-
-            <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px;">
+            <div class="grid-4">
                 <div class="metric-box">📊 P/E: <b>{pe_str}</b></div>
                 <div class="metric-box">💰 EPS: <b>{eps_str}</b></div>
                 <div class="metric-box">⚡ RSI: <b>{rsi_str}</b> <span style="font-size:0.8em; font-weight:normal;">({rsi_text})</span></div>
@@ -712,7 +885,6 @@ if st.session_state['search_triggered']:
         # --------------------------------------------------------------------------------
         # 2. GROUP 2: PURPLE ZONE (Technical Indicators)
         # --------------------------------------------------------------------------------
-        
         vol_str = format_volume(vol_now)
         e20_s = f"{ema20:.2f}" if not np.isnan(ema20) else "N/A"
         e50_s = f"{ema50:.2f}" if not np.isnan(ema50) else "N/A"
@@ -721,38 +893,35 @@ if st.session_state['search_triggered']:
         
         # MACD: Clean text format
         if not np.isnan(macd_val) and not np.isnan(macd_signal):
-            macd_display = f"<span style='font-weight:700;'>{macd_val:.2f}</span> / {macd_signal:.2f}"
+            macd_display = f"<b>{macd_val:.2f}</b> / {macd_signal:.2f}"
         else:
             macd_display = "N/A"
 
         html_box_2 = f"""
         <div class="zone-box-2">
-            <h3 style="margin-top:0; border-bottom:1px solid #d8b4fe; padding-bottom:10px; margin-bottom:15px; display:flex; align-items:center; gap:8px;">
-                📉 Technical Indicators
-            </h3>
-            <div style="font-size:0.95rem;">
-                <div style="display:flex; justify-content:space-between; padding:4px 0; border-bottom:1px dashed #e9d5ff;"><span>EMA 20</span> <b>{e20_s}</b></div>
-                <div style="display:flex; justify-content:space-between; padding:4px 0; border-bottom:1px dashed #e9d5ff;"><span>EMA 50</span> <b>{e50_s}</b></div>
-                <div style="display:flex; justify-content:space-between; padding:4px 0; border-bottom:1px dashed #e9d5ff;"><span>EMA 200</span> <b>{e200_s}</b></div>
-                <div style="display:flex; justify-content:space-between; padding:4px 0; border-bottom:1px dashed #e9d5ff;">
-                    <span>MACD</span> <span>{macd_display}</span>
-                </div>
-                <div style="display:flex; justify-content:space-between; padding:4px 0; border-bottom:1px dashed #e9d5ff;">
+            <h3 style="margin-top:0; border-bottom:1px solid #d8b4fe; padding-bottom:10px; margin-bottom:15px;">📉 Technical Indicators</h3>
+            <div class="grid-2">
+                <div class="flex-between"><span>EMA 20</span> <b>{e20_s}</b></div>
+                <div class="flex-between"><span>EMA 50</span> <b>{e50_s}</b></div>
+                <div class="flex-between"><span>EMA 200</span> <b>{e200_s}</b></div>
+                <div class="flex-between"><span>BB (Up/Low)</span> <b>{bb_s}</b></div>
+            </div>
+            <div style="margin-top:15px; padding-top:10px; border-top:1px dashed #e9d5ff;">
+                <div class="flex-between" style="margin-bottom:8px;">
                     <span>Volume</span> 
                     <span><b>{vol_str}</b> <span style='font-size:0.85em; color:{ai_report['vol_quality_color']}'>({ai_report['vol_quality_msg']})</span></span>
                 </div>
-                <div style="display:flex; justify-content:space-between; padding:4px 0; border-bottom:1px dashed #e9d5ff;"><span>ATR</span> <b>{atr:.2f}</b></div>
-                <div style="display:flex; justify-content:space-between; padding:4px 0;"><span>BB (Up/Low)</span> <b>{bb_s}</b></div>
+                <div class="flex-between">
+                    <span>MACD</span> <span>{macd_display}</span>
+                </div>
             </div>
         </div>
         """
         st.markdown(html_box_2, unsafe_allow_html=True)
 
         # --------------------------------------------------------------------------------
-        # 3. GROUP 3: ORANGE ZONE (Key Levels & Analysis) - With <details>
+        # 3. GROUP 3: ORANGE ZONE (Key Levels & Analysis) - With HTML Details
         # --------------------------------------------------------------------------------
-        
-        # Logic: Breakdown/Breakout Alerts
         breakdown_list = []
         if not np.isnan(ema50) and price < ema50: breakdown_list.append(f"EMA 50 ({ema50:.2f})")
         if not np.isnan(ema200) and price < ema200: breakdown_list.append(f"EMA 200 ({ema200:.2f})")
@@ -767,20 +936,19 @@ if st.session_state['search_triggered']:
         alert_html = ""
         if breakdown_list:
             alert_html = f"""
-            <details style="background:#fef2f2; border:1px solid #ef4444; color:#991b1b; padding:10px; border-radius:8px; margin-bottom:15px; cursor:pointer;">
-                <summary style="font-weight:700;">🚨 WARNING: แนวรับแตก! (คลิก)</summary>
-                <div style="margin-top:5px; font-size:0.9rem;">ราคาหลุด: {', '.join(breakdown_list)} ระวังลงต่อ</div>
+            <details>
+                <summary style="color:#991b1b;">🚨 WARNING: แนวรับแตก! (คลิก)</summary>
+                <div style="color:#7f1d1d; margin-top:5px;">ราคาหลุด: {', '.join(breakdown_list)} ระวังลงต่อ</div>
             </details>
             """
         elif breakout_list:
             alert_html = f"""
-            <details style="background:#f0fdf4; border:1px solid #22c55e; color:#166534; padding:10px; border-radius:8px; margin-bottom:15px; cursor:pointer;">
-                <summary style="font-weight:700;">🚀 ALERT: เบรคแนวต้าน! (คลิก)</summary>
-                <div style="margin-top:5px; font-size:0.9rem;">ทะลุผ่าน: {', '.join(breakout_list)} ลุ้นไปต่อ</div>
+            <details>
+                <summary style="color:#166534;">🚀 ALERT: เบรคแนวต้าน! (คลิก)</summary>
+                <div style="color:#14532d; margin-top:5px;">ทะลุผ่าน: {', '.join(breakout_list)} ลุ้นไปต่อ</div>
             </details>
             """
 
-        # Logic: Supports/Resistances List
         candidates_supp = []
         if not np.isnan(ema20) and ema20 < price: candidates_supp.append({'val': ema20, 'label': "EMA 20"})
         if not np.isnan(ema50) and ema50 < price: candidates_supp.append({'val': ema50, 'label': "EMA 50"})
@@ -799,34 +967,34 @@ if st.session_state['search_triggered']:
         candidates_res.sort(key=lambda x: x['val'])
         res_items = "".join([f"<li style='margin-bottom:4px;'><b>{item['val']:.2f}</b> : {item['label']}</li>" for item in candidates_res[:4] if (item['val'] - price)/price < 0.3]) or "<li>N/A</li>"
 
-        # Logic: Resistance Health Check (Using <details>)
+        # Resistance Health Check (Using <details>)
         next_res_val = candidates_res[0]['val'] if candidates_res else 0
         next_res_desc = candidates_res[0]['label'] if candidates_res else ""
         health_check_html = ""
         if next_res_val > 0 and (next_res_val - price) / price < 0.02:
              health_check_html = f"""
-             <details style="background:#fffbeb; border:1px solid #fbbf24; color:#92400e; padding:10px; border-radius:8px; margin-top:15px; cursor:pointer;">
-                <summary style="font-weight:700;">🔮 ตรวจสุขภาพแนวต้าน (คลิก)</summary>
-                <div style="margin-top:5px; font-size:0.9rem;">
+             <details>
+                <summary style="color:#b45309;">🔮 ตรวจสุขภาพแนวต้าน (คลิก)</summary>
+                <div style="margin-top:5px; color:#92400e;">
                     กำลังทดสอบ: <b>{next_res_val:.2f}</b> ({next_res_desc})<br>
-                    <i>(ดูรายละเอียด Momentum และ Volume ในส่วน Technical)</i>
+                    <i>(ดู Momentum/Volume ในส่วน Technical ประกอบ)</i>
                 </div>
              </details>
              """
 
         html_box_3 = f"""
         <div class="zone-box-3">
-            <h3 style="margin-top:0; border-bottom:1px solid #fed7aa; padding-bottom:10px; margin-bottom:15px; display:flex; align-items:center; gap:8px;">
-                🚧 Key Levels & Analysis
-            </h3>
+            <h3 style="margin-top:0; border-bottom:1px solid #fed7aa; padding-bottom:10px; margin-bottom:15px;">🚧 Key Levels & Analysis</h3>
             {alert_html}
-            <div style="margin-bottom:15px;">
-                <div style="font-weight:700; color:#166534; font-size:1.1rem; margin-bottom:5px;">🟢 แนวรับ (Supports)</div>
-                <ul style="padding-left:20px; color:#14532d; font-size:0.95em; margin:0;">{supp_items}</ul>
-            </div>
-            <div>
-                <div style="font-weight:700; color:#991b1b; font-size:1.1rem; margin-bottom:5px;">🔴 แนวต้าน (Resistances)</div>
-                <ul style="padding-left:20px; color:#7f1d1d; font-size:0.95em; margin:0;">{res_items}</ul>
+            <div class="grid-2" style="margin-top:15px;">
+                <div>
+                    <div style="font-weight:700; color:#166534; margin-bottom:5px;">🟢 แนวรับ (Supports)</div>
+                    <ul style="padding-left:20px; color:#14532d; margin:0;">{supp_items}</ul>
+                </div>
+                <div>
+                    <div style="font-weight:700; color:#991b1b; margin-bottom:5px;">🔴 แนวต้าน (Resistances)</div>
+                    <ul style="padding-left:20px; color:#7f1d1d; margin:0;">{res_items}</ul>
+                </div>
             </div>
             {health_check_html}
         </div>
@@ -834,12 +1002,11 @@ if st.session_state['search_triggered']:
         st.markdown(html_box_3, unsafe_allow_html=True)
 
         # --------------------------------------------------------------------------------
-        # 4. STRATEGY & X-RAY (Mix) - Keeping specific styles
+        # 4. STRATEGY & X-RAY (Card Style)
         # --------------------------------------------------------------------------------
         c_xray, c_strat = st.columns([1, 1.2])
         
         with c_xray:
-            # X-Ray Display (White box, clean look)
             sq_col = "#f97316" if ai_report['is_squeeze'] else "#0369a1"
             st.markdown(f"""
             <div class='xray-box'>
@@ -854,8 +1021,7 @@ if st.session_state['search_triggered']:
             """, unsafe_allow_html=True)
 
         with c_strat:
-            # Execution Plan Display (Dynamic Color)
-            c_theme = {"bg": "#fef9c3", "border": "#eab308", "text": "#713f12"} # Default
+            c_theme = {"bg": "#fef9c3", "border": "#eab308", "text": "#713f12"} 
             if ai_report['status_color'] == "green": c_theme = {"bg": "#dcfce7", "border": "#22c55e", "text": "#14532d"}
             elif ai_report['status_color'] == "red": c_theme = {"bg": "#fee2e2", "border": "#ef4444", "text": "#7f1d1d"}
             elif ai_report['status_color'] == "orange": c_theme = {"bg": "#ffedd5", "border": "#f97316", "text": "#7c2d12"}
@@ -880,17 +1046,15 @@ if st.session_state['search_triggered']:
         
         html_box_4 = f"""
         <div class="zone-box-4">
-            <h3 style="margin-top:0; border-bottom:1px solid #fecdd3; padding-bottom:10px; margin-bottom:15px; display:flex; align-items:center; gap:8px;">
-                ⚖️ Bullish vs Bearish Factors
-            </h3>
-            <div style="display:grid; grid-template-columns: 1fr 1fr; gap:20px;">
+            <h3 style="margin-top:0; border-bottom:1px solid #fecdd3; padding-bottom:10px; margin-bottom:15px;">⚖️ Bullish vs Bearish Factors</h3>
+            <div class="grid-2">
                 <div>
                     <div style="font-weight:700; color:#15803d; margin-bottom:5px;">🟢 ปัจจัยบวก (Bullish)</div>
-                    <ul style="padding-left:20px; color:#14532d; font-size:0.95em; margin:0;">{bull_items if bull_items else "<li>None</li>"}</ul>
+                    <ul style="padding-left:20px; color:#14532d; margin:0;">{bull_items if bull_items else "<li>None</li>"}</ul>
                 </div>
                 <div>
                     <div style="font-weight:700; color:#991b1b; margin-bottom:5px;">🔴 ปัจจัยลบ (Bearish)</div>
-                    <ul style="padding-left:20px; color:#7f1d1d; font-size:0.95em; margin:0;">{bear_items if bear_items else "<li>None</li>"}</ul>
+                    <ul style="padding-left:20px; color:#7f1d1d; margin:0;">{bear_items if bear_items else "<li>None</li>"}</ul>
                 </div>
             </div>
         </div>
