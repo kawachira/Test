@@ -630,7 +630,7 @@ def ai_hybrid_analysis(price, ema20, ema50, ema200, rsi, macd_val, macd_sig, adx
         "in_demand_zone": in_demand_zone, "confluence_msg": confluence_msg,
         "is_squeeze": is_squeeze, "obv_insight": obv_insight
     }
-# --- 8. Main Execution & Display (ส่วนแสดงผลหลัก - Finalized UI) ---
+# --- 8. Main Execution & Display (ส่วนแสดงผลหลัก - Final Renovation) ---
 
 # 1. อัปเดต State เมื่อกดปุ่มค้นหา
 if submit_btn:
@@ -643,15 +643,19 @@ if st.session_state['search_triggered']:
     
     st.divider()
     
-    # CSS เสริมสำหรับการจัด Layout ภายใน (Grid System)
+    # CSS เสริมสำหรับการจัด Layout ภายในกรอบ (Grid System)
     st.markdown("""
     <style>
     .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
     .grid-4 { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 10px; }
     .flex-between { display: flex; justify-content: space-between; align-items: center; }
-    /* ปรับแต่ง details/summary ให้สวยงามในกรอบ */
-    details { background: rgba(255,255,255,0.5); border-radius: 8px; padding: 10px; margin-top: 10px; border: 1px solid rgba(0,0,0,0.1); }
-    summary { font-weight: bold; cursor: pointer; outline: none; }
+    
+    /* ปรับแต่ง details/summary (Expander ในกรอบ) ให้สวยงาม */
+    details { background: rgba(255,255,255,0.6); border-radius: 8px; padding: 10px; margin-top: 10px; border: 1px solid rgba(0,0,0,0.1); }
+    summary { font-weight: 700; cursor: pointer; outline: none; list-style: none; }
+    summary::-webkit-details-marker { display: none; } /* ซ่อนสามเหลี่ยมเดิม */
+    summary::after { content: " ▼"; font-size: 0.8em; } /* ใส่ลูกศรใหม่ */
+    details[open] summary::after { content: " ▲"; }
     </style>
     """, unsafe_allow_html=True)
     
@@ -668,7 +672,7 @@ if st.session_state['search_triggered']:
             df_stats_day = pd.DataFrame(); df_stats_week = pd.DataFrame()
 
     if df is not None and not df.empty and len(df) > 20: 
-        # --- Indicator Calculation ---
+        # --- Indicator Calculation (Logic เดิม 100%) ---
         df['EMA20'] = ta.ema(df['Close'], length=20)
         df['EMA50'] = ta.ema(df['Close'], length=50)
         
@@ -804,10 +808,8 @@ if st.session_state['search_triggered']:
         if reg_price and reg_chg: prev_c = reg_price - reg_chg; reg_pct = (reg_chg / prev_c) * 100 if prev_c != 0 else 0.0
         else: reg_pct = 0.0
         
-        if reg_chg >= 0:
-            price_class = "price-pill-green"; arrow_icon = "▲"
-        else:
-            price_class = "price-pill-red"; arrow_icon = "▼"
+        if reg_chg >= 0: price_class = "price-pill-green"; arrow_icon = "▲"
+        else: price_class = "price-pill-red"; arrow_icon = "▼"
 
         st_color = ai_report["status_color"]
         main_status = ai_report["banner_title"]
@@ -856,15 +858,18 @@ if st.session_state['search_triggered']:
             </div>
             <div style="text-align:center; font-size:26px; font-weight:800; line-height:1.1; margin-bottom:5px;">{info['longName']}</div>
             <div style="text-align:center; font-size:18px; color:#64748b; font-weight:600; margin-bottom:15px;">({symbol_input})</div>
+            
             <div style="display:flex; justify-content:center; align-items:baseline; gap:10px; margin-bottom:10px;">
                 <div style="font-size:48px; font-weight:800; color:#0f172a; line-height:1;">{reg_price:,.2f} <span style="font-size:18px; color:#64748b; font-weight:500;">USD</span></div>
             </div>
+            
             <div style="display:flex; justify-content:center; margin-bottom:10px;">
                 <div class="{price_class}" style="font-size:1.1rem; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
                     {arrow_icon} {reg_chg:+.2f} ({reg_pct:.2f}%)
                 </div>
             </div>
             <div style="text-align:center; margin-bottom:20px;">{pre_post_html}</div>
+
             <div style="{status_pill_style} padding:15px; border-radius:12px; margin-bottom:20px; text-align:left; box-shadow: 0 2px 4px rgba(0,0,0,0.05);">
                 <div style="display:flex; align-items:center; gap:10px; margin-bottom:5px;">
                     <span style="font-size:24px;">{st_icon}</span>
@@ -872,6 +877,7 @@ if st.session_state['search_triggered']:
                 </div>
                 <div style="font-size:1rem; font-weight:600; opacity:0.8; margin-left:38px;">{tf_label}</div>
             </div>
+
             <div class="grid-4">
                 <div class="metric-box">📊 P/E: <b>{pe_str}</b></div>
                 <div class="metric-box">💰 EPS: <b>{eps_str}</b></div>
@@ -893,7 +899,7 @@ if st.session_state['search_triggered']:
         
         # MACD: Clean text format
         if not np.isnan(macd_val) and not np.isnan(macd_signal):
-            macd_display = f"<b>{macd_val:.2f}</b> / {macd_signal:.2f}"
+            macd_display = f"<span style='font-weight:700;'>{macd_val:.2f}</span> / {macd_signal:.2f}"
         else:
             macd_display = "N/A"
 
@@ -1002,7 +1008,7 @@ if st.session_state['search_triggered']:
         st.markdown(html_box_3, unsafe_allow_html=True)
 
         # --------------------------------------------------------------------------------
-        # 4. STRATEGY & X-RAY (Card Style)
+        # 4. STRATEGY & X-RAY (Mix) - Keeping specific styles
         # --------------------------------------------------------------------------------
         c_xray, c_strat = st.columns([1, 1.2])
         
