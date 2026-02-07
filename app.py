@@ -643,7 +643,7 @@ if st.session_state['search_triggered']:
     
     st.divider()
     
-    # CSS เสริมสำหรับการจัด Layout ภายในกรอบ (Grid System)
+    # CSS เสริมสำหรับการจัด Layout ภายในกรอบ (Grid System & Details)
     st.markdown("""
     <style>
     .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
@@ -653,8 +653,8 @@ if st.session_state['search_triggered']:
     /* ปรับแต่ง details/summary (Expander ในกรอบ) ให้สวยงาม */
     details { background: rgba(255,255,255,0.6); border-radius: 8px; padding: 10px; margin-top: 10px; border: 1px solid rgba(0,0,0,0.1); }
     summary { font-weight: 700; cursor: pointer; outline: none; list-style: none; }
-    summary::-webkit-details-marker { display: none; } /* ซ่อนสามเหลี่ยมเดิม */
-    summary::after { content: " ▼"; font-size: 0.8em; } /* ใส่ลูกศรใหม่ */
+    summary::-webkit-details-marker { display: none; }
+    summary::after { content: " ▼"; font-size: 0.8em; }
     details[open] summary::after { content: " ▲"; }
     </style>
     """, unsafe_allow_html=True)
@@ -786,7 +786,7 @@ if st.session_state['search_triggered']:
             "หุ้น": symbol_input, 
             "TF": timeframe, 
             "ราคา": f"{price:.2f}", 
-            "Change%": pct_str,
+            "Change%": pct_str, 
             "สถานะ": th_score,
             "Action": th_action,
             "SL": f"{ai_report['sl']:.2f}", 
@@ -808,9 +808,11 @@ if st.session_state['search_triggered']:
         if reg_price and reg_chg: prev_c = reg_price - reg_chg; reg_pct = (reg_chg / prev_c) * 100 if prev_c != 0 else 0.0
         else: reg_pct = 0.0
         
+        # Logic: Price Pill Class (Nested Card)
         if reg_chg >= 0: price_class = "price-pill-green"; arrow_icon = "▲"
         else: price_class = "price-pill-red"; arrow_icon = "▼"
 
+        # Logic: Status Pill Style (Nested Card)
         st_color = ai_report["status_color"]
         main_status = ai_report["banner_title"]
         if st_color == "green": 
@@ -897,7 +899,7 @@ if st.session_state['search_triggered']:
         e200_s = f"{ema200:.2f}" if (ema200 is not None and not np.isnan(ema200)) else "N/A"
         bb_s = f"{bb_upper:.2f} / {bb_lower:.2f}" if not np.isnan(bb_upper) else "N/A"
         
-        # MACD: Clean text format
+        # FIX MACD: Clean text format (No HTML Code visible)
         if not np.isnan(macd_val) and not np.isnan(macd_signal):
             macd_display = f"<span style='font-weight:700;'>{macd_val:.2f}</span> / {macd_signal:.2f}"
         else:
@@ -1008,7 +1010,7 @@ if st.session_state['search_triggered']:
         st.markdown(html_box_3, unsafe_allow_html=True)
 
         # --------------------------------------------------------------------------------
-        # 4. STRATEGY & X-RAY (Mix) - Keeping specific styles
+        # 4. STRATEGY & X-RAY (Mix)
         # --------------------------------------------------------------------------------
         c_xray, c_strat = st.columns([1, 1.2])
         
@@ -1056,11 +1058,11 @@ if st.session_state['search_triggered']:
             <div class="grid-2">
                 <div>
                     <div style="font-weight:700; color:#15803d; margin-bottom:5px;">🟢 ปัจจัยบวก (Bullish)</div>
-                    <ul style="padding-left:20px; color:#14532d; margin:0;">{bull_items if bull_items else "<li>None</li>"}</ul>
+                    <ul style="padding-left:20px; color:#14532d; font-size:0.95em; margin:0;">{bull_items if bull_items else "<li>None</li>"}</ul>
                 </div>
                 <div>
                     <div style="font-weight:700; color:#991b1b; margin-bottom:5px;">🔴 ปัจจัยลบ (Bearish)</div>
-                    <ul style="padding-left:20px; color:#7f1d1d; margin:0;">{bear_items if bear_items else "<li>None</li>"}</ul>
+                    <ul style="padding-left:20px; color:#7f1d1d; font-size:0.95em; margin:0;">{bear_items if bear_items else "<li>None</li>"}</ul>
                 </div>
             </div>
         </div>
